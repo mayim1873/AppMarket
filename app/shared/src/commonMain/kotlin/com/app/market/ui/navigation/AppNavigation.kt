@@ -16,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
@@ -112,6 +115,22 @@ fun AppNavigation(
     CompositionLocalProvider(LocalNavigator provides navigator) {
         val currentRoute = navigator.backStack.lastOrNull() ?: Route.Main
         val stateHolder = rememberSaveableStateHolder()
+
+        // 每个返回栈条目独享 ViewModelStore；条目出栈时清理，避免详情页之间互相复用 ViewModel。
+        val entryOwners = remember { mutableMapOf<String, EntryViewModelStoreOwner>() }
+        val backStackKeys = navigator.backStack.map { it.toString() }
+        LaunchedEffect(backStackKeys) {
+            val alive = backStackKeys.toSet()
+            val iterator = entryOwners.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (entry.key !in alive) {
+                    entry.value.viewModelStore.clear()
+                    stateHolder.removeState(entry.key)
+                    iterator.remove()
+                }
+            }
+        }
         AnimatedContent(
             targetState = currentRoute,
             transitionSpec = {
@@ -130,9 +149,16 @@ fun AppNavigation(
             },
             label = "AppNavigation",
         ) { route ->
-            // 用可序列化的字符串作为状态 key，保证配置变更后滚动位置等状态可恢复。
-            stateHolder.SaveableStateProvider(route.toString()) {
-                when (route) {
+            // 每个返回栈条目独享一个 ViewModelStore：详情页等按路由持有自己的 ViewModel，
+            // 否则 koinViewModel() 会因共用 Activity 的 store 而复用上一个页面的实例。
+            val entryKey = route.toString()
+            val entryOwner = remember(entryKey) {
+                entryOwners.getOrPut(entryKey) { EntryViewModelStoreOwner() }
+            }
+            CompositionLocalProvider(LocalViewModelStoreOwner provides entryOwner) {
+                // 用可序列化的字符串作为状态 key，保证配置变更后滚动位置等状态可恢复。
+                stateHolder.SaveableStateProvider(entryKey) {
+                    when (route) {
                     Route.Main -> MainPage(
                         navigator = navigator,
                         updatesViewModel = updatesViewModel,
@@ -302,9 +328,15 @@ fun AppNavigation(
                         ThemeSettingsScreen(vm, onBack = { navigator.pop() })
                     }
                 }
+                }
             }
         }
     }
+}
+
+/** 单个返回栈条目的 ViewModelStore，随条目出栈一并清理。 */
+private class EntryViewModelStoreOwner : ViewModelStoreOwner {
+    override val viewModelStore = ViewModelStore()
 }
 
 internal fun ignoredDetailRoute(entry: IgnoredUpdate, activeSource: AppSource): Route.AppDetail {

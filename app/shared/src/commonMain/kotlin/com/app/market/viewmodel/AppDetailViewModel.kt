@@ -59,6 +59,7 @@ class AppDetailViewModel(
 
     // in-flight 去重靠 job 而非布尔标记：失败后必须允许重新加载，否则错误态永久卡死
     private var loadJob: Job? = null
+    private var loadedAppKey: String? = null
     private val pendingDownloads = mutableSetOf<String>()
 
     init {
@@ -75,8 +76,17 @@ class AppDetailViewModel(
         externalQuery: String? = null,
         source: AppSource = AppSource.XIAOMI,
     ) {
-        if (loadJob?.isActive == true) return
-        if (_uiState.value.detail != null) return
+        val appKey = "$source|$appId|$packageName|${externalQuery.orEmpty()}"
+        // 同一应用：加载中或已加载成功则不重复请求；失败后允许重试。
+        if (appKey == loadedAppKey && (loadJob?.isActive == true || _uiState.value.detail != null)) {
+            return
+        }
+        if (appKey != loadedAppKey) {
+            // 切换到另一个应用：取消旧请求并清空上一个应用的残留状态。
+            loadJob?.cancel()
+            _uiState.value = AppDetailUiState()
+        }
+        loadedAppKey = appKey
         _uiState.update { it.copy(loading = true, errorMessage = "") }
         loadJob = viewModelScope.launch {
             try {
