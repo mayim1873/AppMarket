@@ -8,8 +8,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.app.market.ui.theme.MarketShapeTokens
 
 /**
- * M3E 基础卡片：28dp 大圆角、`surfaceContainerLow` 低饱和容器色、无阴影（靠色调分层）。
+ * Material 3 卡片封装：`Card` + 大圆角与 `surfaceContainerLow` 容器色，默认零阴影（靠色调分层）。
  */
 @Composable
 fun MarketCard(
@@ -40,13 +41,14 @@ fun MarketCard(
         onClick != null -> Modifier.combinedClickable(onClick = onClick)
         else -> Modifier
     }
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(cornerRadius))
-            .then(clickModifier),
+    Card(
+        modifier = modifier.then(clickModifier),
         shape = RoundedCornerShape(cornerRadius),
-        color = containerColor,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.padding(contentPadding)) {
             content()

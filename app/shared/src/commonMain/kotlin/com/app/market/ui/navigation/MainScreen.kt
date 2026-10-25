@@ -23,6 +23,10 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Update
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -46,6 +50,7 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.app.market.domain.model.market.MarketAppInfo
 import com.app.market.domain.model.preference.HomePage
+import com.app.market.domain.repository.ThemePreferencesRepository
 import com.app.market.platform.UiPlatform
 import com.app.market.resources.Res
 import com.app.market.resources.nav_search
@@ -211,8 +216,13 @@ fun MainPage(
             icon = tab.icon,
             label = stringResource(tab.labelRes),
             badgeCount = navigationBadgeCount(tab, updatesState.updates.size),
+            unselectedIcon = tab.unselectedIcon,
         )
     }
+
+    val themePreferences = koinInject<ThemePreferencesRepository>()
+    val navRailExpanded by themePreferences.navRailExpanded.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     if (isWideScreen) {
         Row(Modifier.fillMaxSize()) {
@@ -220,9 +230,10 @@ fun MainPage(
                 items = navItems,
                 selectedIndex = selectedPage,
                 onSelected = { index -> onTabClick(index, tabs[index]) },
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars)),
+                expanded = navRailExpanded,
+                onExpandedChange = { expanded ->
+                    scope.launch { themePreferences.setNavRailExpanded(expanded) }
+                },
             )
             pagerContent(
                 Modifier
@@ -273,6 +284,14 @@ private val MainTab.icon: ImageVector
         MainTab.Updates -> Icons.Filled.Update
         MainTab.Search -> Icons.Filled.Search
         MainTab.Settings -> Icons.Filled.Settings
+    }
+
+private val MainTab.unselectedIcon: ImageVector
+    get() = when (this) {
+        MainTab.Today -> Icons.Outlined.Explore
+        MainTab.Updates -> Icons.Outlined.Update
+        MainTab.Search -> Icons.Outlined.Search
+        MainTab.Settings -> Icons.Outlined.Settings
     }
 
 private val MainTab.labelRes

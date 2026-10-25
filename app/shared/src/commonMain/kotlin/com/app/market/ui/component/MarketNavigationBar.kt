@@ -1,56 +1,56 @@
 package com.app.market.ui.component
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuOpen
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.WideNavigationRail
+import androidx.compose.material3.WideNavigationRailDefaults
+import androidx.compose.material3.WideNavigationRailItem
+import androidx.compose.material3.WideNavigationRailValue
+import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
-/** 底部 / 侧边导航的一个目的地。 */
+/**
+ * 底部 / 侧边导航的一个目的地。
+ *
+ * 与 Material 规范一致：选中态用实心图标，未选中态用轮廓图标。
+ */
 data class MarketNavItem(
     val icon: ImageVector,
     val label: String,
     val badgeCount: Int = 0,
+    val unselectedIcon: ImageVector = icon,
 )
 
 /**
- * 固定底栏（M3 NavigationBar 形态）：贴底、通栏、随系统导航栏内边距一起占位，
- * 选中项使用药丸指示器。由外层 Scaffold 的 `bottomBar` 持有，内容区自动避让。
+ * 标准 Material 3 底栏：`ShortNavigationBar`（M3E）作为 Scaffold 的 bottomBar，
+ * 通栏、内建系统栏内边距，选中项由组件自身绘制药丸指示器。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MarketNavigationBar(
     items: List<MarketNavItem>,
@@ -58,179 +58,136 @@ fun MarketNavigationBar(
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
+    ShortNavigationBar(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        windowInsets = WindowInsets.systemBars
+            .union(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            HorizontalDivider(
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                    .heightIn(min = 64.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items.forEachIndexed { index, item ->
-                    NavBarItem(
-                        item = item,
-                        selected = index == selectedIndex,
-                        onClick = { onSelected(index) },
-                        modifier = Modifier.weight(1f),
+        items.forEachIndexed { index, item ->
+            val selected = index == selectedIndex
+            ShortNavigationBarItem(
+                selected = selected,
+                onClick = { onSelected(index) },
+                icon = {
+                    NavBarIcon(
+                        icon = if (selected) item.icon else item.unselectedIcon,
+                        contentDescription = item.label,
+                        badgeCount = item.badgeCount,
                     )
-                }
-            }
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun NavBarItem(
-    item: MarketNavItem,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun NavBarIcon(
+    icon: ImageVector,
+    contentDescription: String?,
+    badgeCount: Int,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val indicatorColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            Color.Transparent
-        },
-        label = "navIndicator",
-    )
-    val iconColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        label = "navIcon",
-    )
-    val labelColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        label = "navLabel",
-    )
-    val indicatorHorizontalPadding by animateDpAsState(
-        targetValue = if (selected) 18.dp else 14.dp,
-        label = "navIndicatorPadding",
-    )
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(100))
-                .background(indicatorColor)
-                .padding(horizontal = indicatorHorizontalPadding, vertical = 5.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (item.badgeCount > 0) {
-                BadgedBox(
-                    badge = {
-                        Badge {
-                            Text(item.badgeCount.toString())
-                        }
-                    },
-                ) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.label,
-                        modifier = Modifier.size(24.dp),
-                        tint = iconColor,
-                    )
+    if (badgeCount > 0) {
+        BadgedBox(
+            badge = {
+                Badge {
+                    Text(badgeCount.toString())
                 }
-            } else {
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = item.label,
-                    modifier = Modifier.size(24.dp),
-                    tint = iconColor,
-                )
-            }
+            },
+        ) {
+            Icon(imageVector = icon, contentDescription = contentDescription)
         }
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = item.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = labelColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+    } else {
+        Icon(imageVector = icon, contentDescription = contentDescription)
     }
 }
 
-/** 宽屏侧边导航：M3 NavigationRail，选中项带药丸指示器。 */
+/**
+ * 标准 Material 3 Expressive 侧边导航：`WideNavigationRail`，可在收起 / 展开之间切换。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MarketNavigationRail(
     items: List<MarketNavItem>,
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    NavigationRail(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surface,
+    val state = rememberWideNavigationRailState(
+        initialValue = if (expanded) {
+            WideNavigationRailValue.Expanded
+        } else {
+            WideNavigationRailValue.Collapsed
+        },
+    )
+    val scope = rememberCoroutineScope()
+    val isExpanded = state.targetValue == WideNavigationRailValue.Expanded
+    LaunchedEffect(state.targetValue) {
+        onExpandedChange(state.targetValue == WideNavigationRailValue.Expanded)
+    }
+
+    WideNavigationRail(
+        modifier = modifier.fillMaxHeight(),
+        state = state,
+        colors = WideNavigationRailDefaults.colors().copy(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        windowInsets = WindowInsets.systemBars
+            .union(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Start + WindowInsetsSides.Vertical),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 20.dp),
         header = {
-            Box(modifier = Modifier.size(24.dp))
+            IconButton(
+                modifier = Modifier.padding(start = 24.dp),
+                onClick = {
+                    scope.launch {
+                        if (isExpanded) state.collapse() else state.expand()
+                    }
+                },
+            ) {
+                Icon(
+                    imageVector = if (isExpanded) {
+                        Icons.AutoMirrored.Filled.MenuOpen
+                    } else {
+                        Icons.Filled.Menu
+                    },
+                    contentDescription = null,
+                )
+            }
         },
     ) {
         items.forEachIndexed { index, item ->
-            NavigationRailItem(
-                selected = index == selectedIndex,
+            val selected = index == selectedIndex
+            WideNavigationRailItem(
+                railExpanded = isExpanded,
+                selected = selected,
                 onClick = { onSelected(index) },
-                icon = { RailIcon(item) },
-                label = { Text(item.label, maxLines = 1) },
-                colors = NavigationRailItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                ),
+                icon = {
+                    NavBarIcon(
+                        icon = if (selected) item.icon else item.unselectedIcon,
+                        contentDescription = item.label,
+                        badgeCount = item.badgeCount,
+                    )
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
             )
         }
-    }
-}
-
-@Composable
-private fun RailIcon(item: MarketNavItem) {
-    if (item.badgeCount > 0) {
-        BadgedBox(
-            badge = {
-                Badge {
-                    Text(item.badgeCount.toString())
-                }
-            },
-        ) {
-            Icon(
-                imageVector = item.icon,
-                contentDescription = item.label,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-    } else {
-        Icon(
-            imageVector = item.icon,
-            contentDescription = item.label,
-            modifier = Modifier.size(24.dp),
-        )
     }
 }
