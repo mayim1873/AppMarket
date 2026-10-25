@@ -54,7 +54,7 @@ fun SettingsGroup(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             shape = RoundedCornerShape(MarketShapeTokens.CardCorner),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            color = MaterialTheme.colorScheme.surfaceBright,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Column(modifier = Modifier.padding(vertical = 4.dp)) {
@@ -202,7 +202,7 @@ fun SettingsArrowRow(
     )
 }
 
-/** 下拉选择行：点击弹出 M3 菜单，当前值显示在行尾。 */
+/** 下拉选择行：点击弹出 M3 菜单，当前值显示在行尾，菜单锚定在行尾控件处。 */
 @Composable
 fun SettingsDropdownRow(
     title: String,
@@ -214,13 +214,15 @@ fun SettingsDropdownRow(
     enabled: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        SettingsRow(
-            title = title,
-            summary = summary,
-            enabled = enabled,
-            onClick = { if (enabled) expanded = true },
-            trailing = {
+    SettingsRow(
+        title = title,
+        modifier = modifier,
+        summary = summary,
+        enabled = enabled,
+        onClick = { if (enabled) expanded = true },
+        trailing = {
+            // 菜单放在行尾 Box 内，锚点即当前值 / 箭头所在位置（不会从整行左侧弹出）。
+            Box {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = items.getOrNull(selectedIndex).orEmpty(),
@@ -234,30 +236,30 @@ fun SettingsDropdownRow(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            },
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            items.forEachIndexed { index, label ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    onClick = {
-                        expanded = false
-                        onSelectedIndexChange(index)
-                    },
-                    trailingIcon = {
-                        if (index == selectedIndex) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                            )
-                        }
-                    },
-                )
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                ) {
+                    items.forEachIndexed { index, label ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                expanded = false
+                                onSelectedIndexChange(index)
+                            },
+                            trailingIcon = {
+                                if (index == selectedIndex) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
             }
-        }
-    }
+        },
+    )
 }

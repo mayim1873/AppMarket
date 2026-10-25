@@ -500,17 +500,6 @@ fun AppDetailScreen(
                                         minHeight = BOTTOM_ACTION_MIN_HEIGHT,
                                         modifier = Modifier.weight(1f),
                                     )
-                                    if (barActions.hasMenu) {
-                                        DetailMoreMenu(
-                                            canOpenOtherAppStore = barActions.canOpenOtherAppStore,
-                                            canRedownload = barActions.canRedownload,
-                                            canCancelDownload = barActions.canCancelDownload,
-                                            onOpenOtherAppStore = barActions.onOpenOtherAppStore,
-                                            onRedownload = barActions.onRedownload,
-                                            onClearDownload = barActions.onClearDownload,
-                                            tonal = true,
-                                        )
-                                    }
                                 }
                             }
                         }

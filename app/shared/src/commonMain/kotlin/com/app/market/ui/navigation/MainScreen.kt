@@ -260,7 +260,7 @@ fun MainPage(
                     onSelected = { index -> onTabClick(index, tabs[index]) },
                 )
             },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentWindowInsets = WindowInsets(0),
         ) { innerPadding ->
             pagerContent(

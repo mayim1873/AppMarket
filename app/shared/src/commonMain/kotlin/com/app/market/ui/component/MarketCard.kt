@@ -20,7 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.app.market.ui.theme.MarketShapeTokens
 
 /**
- * Material 3 卡片封装：`Card` + 大圆角与 `surfaceContainerLow` 容器色，默认零阴影（靠色调分层）。
+ * Material 3 卡片封装：`Card` + 大圆角与 `surfaceBright` 容器色，默认零阴影（靠色调分层）。
+ * 页面底色为 `surfaceContainer`，卡片用更亮的 `surfaceBright`，与 KernelSU 的层次一致。
  */
 @Composable
 fun MarketCard(
@@ -28,7 +29,7 @@ fun MarketCard(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(16.dp),
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceBright,
     cornerRadius: Dp = MarketShapeTokens.CardCorner,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -82,7 +83,7 @@ fun CardSegmentContainer(
                     bottomEnd = bottomCorner,
                 ),
             )
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            .background(MaterialTheme.colorScheme.surfaceBright),
         content = content,
     )
 }

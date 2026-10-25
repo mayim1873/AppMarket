@@ -33,6 +33,7 @@ kotlin {
             implementation(projects.domain)
             api(libs.compose.material3)
             implementation(libs.material.icons.extended)
+            implementation(libs.material.kolor)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime)
             implementation(libs.androidx.navigationevent)

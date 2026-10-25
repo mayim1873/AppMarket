@@ -100,7 +100,7 @@ fun MarketScaffold(
         contentWindowInsets = WindowInsets.safeDrawing
             .union(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) { innerPadding ->
         content(innerPadding, Modifier, scrollBehavior)
     }
@@ -135,7 +135,7 @@ fun MainTabScaffold(
         contentWindowInsets = WindowInsets.safeDrawing
             .union(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) { innerPadding ->
         content(innerPadding.calculateTopPadding(), Modifier, scrollBehavior)
     }
@@ -161,11 +161,11 @@ private fun BackButton(onClick: () -> Unit) {
     }
 }
 
-/** 顶栏配色：M3E 用 surface 容器色，滚动时保持不透明以避免内容穿透。 */
+/** 顶栏配色：与 Scaffold 同为 `surfaceContainer`，滚动时保持不透明以避免内容穿透。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun appBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
-    containerColor = MaterialTheme.colorScheme.surface,
+    containerColor = MaterialTheme.colorScheme.surfaceContainer,
     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
     titleContentColor = MaterialTheme.colorScheme.onSurface,
     navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,

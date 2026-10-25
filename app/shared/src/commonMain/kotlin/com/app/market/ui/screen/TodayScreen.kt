@@ -155,7 +155,8 @@ fun TodayTab(
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = statusBarTop + 8.dp,
+                // 大标题与状态栏之间留出与其它页面大顶栏一致的呼吸感
+                top = statusBarTop + 24.dp,
                 bottom = PageVerticalPadding,
             ),
             horizontalArrangement = Arrangement.spacedBy(20.dp),

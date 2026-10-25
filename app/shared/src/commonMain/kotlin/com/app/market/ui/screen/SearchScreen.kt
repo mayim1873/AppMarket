@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -374,8 +374,12 @@ private fun SearchResultsList(
             }
         }
 
-        // key 需唯一：同一包名可能来自不同来源，因此带上 source。
-        items(state.results, key = { "${it.app.source}:${it.app.packageName}" }) { item ->
+        // key 必须唯一：同一条目可能重复出现（同一包名 / 同一来源），只用包名会让
+        // LazyColumn 复用首个条目的组合，表现为「点哪一项都打开第一条」。这里加上序号。
+        itemsIndexed(
+            state.results,
+            key = { index, item -> "result-$index-${item.app.source}:${item.app.packageName}" },
+        ) { _, item ->
             val app = item.app
             val packageName = app.packageName
             val downloadState by remember(packageName) {
