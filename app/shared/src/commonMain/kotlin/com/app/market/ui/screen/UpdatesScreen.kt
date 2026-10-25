@@ -50,7 +50,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.market.domain.model.download.DownloadState
@@ -91,7 +90,6 @@ import org.koin.compose.koinInject
 @Composable
 fun UpdatesTab(
     viewModel: UpdatesViewModel,
-    bottomPadding: Dp,
     onOpenDetail: (MarketAppInfo) -> Unit,
 ) {
     val uiPlatform = koinInject<UiPlatform>()
@@ -106,7 +104,7 @@ fun UpdatesTab(
             start = 16.dp,
             end = 16.dp,
             top = topPadding + PageVerticalPadding,
-            bottom = bottomPadding + PageVerticalPadding,
+            bottom = PageVerticalPadding,
         )
         val content = when {
             state.updates.isNotEmpty() -> UpdatesContent.Cards

@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
@@ -97,7 +96,6 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun SearchTab(
     viewModel: SearchViewModel,
-    bottomPadding: Dp,
     onOpenDetail: (MarketAppInfo) -> Unit,
     isCurrentPage: Boolean = true,
     focusRequestId: Int = 0,
@@ -160,7 +158,7 @@ fun SearchTab(
         start = 16.dp,
         end = 16.dp,
         top = PageVerticalPadding,
-        bottom = bottomPadding + PageVerticalPadding,
+        bottom = PageVerticalPadding,
     )
 
     Scaffold(

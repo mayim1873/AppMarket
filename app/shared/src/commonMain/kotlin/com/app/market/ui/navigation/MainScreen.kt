@@ -2,11 +2,9 @@ package com.app.market.ui.navigation
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.MutatePriority
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,6 +23,8 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Update
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -74,9 +74,6 @@ import kotlin.math.abs
 
 // 主页签集合按平台能力裁剪：桌面端（无法扫描已装应用 / 安装）不含「更新」。
 private enum class MainTab { Today, Updates, Search, Settings }
-
-/** 悬浮导航栏占用的垂直空间，用于给页面列表预留底部内边距。 */
-private val NavigationBarHeight = 84.dp
 
 @Composable
 fun MainPage(
@@ -161,8 +158,7 @@ fun MainPage(
         navigator.push(Route.AppDetail(app.appId, app.packageName, app.displayName, source = app.source))
     }
 
-    val navigationBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val pagerContent: @Composable (Modifier, Dp) -> Unit = { pagerModifier, bottomPadding ->
+    val pagerContent: @Composable (Modifier) -> Unit = { pagerModifier ->
         HorizontalPager(
             modifier = pagerModifier,
             state = mainPagerState.pagerState,
@@ -174,7 +170,6 @@ fun MainPage(
                 MainTab.Today -> TodayTab(
                     viewModel = todayViewModel,
                     updatesViewModel = updatesViewModel.takeIf { appManagementSupported },
-                    bottomPadding = bottomPadding,
                     onClickViewUpdates = { tabs.indexOf(MainTab.Updates).takeIf { it >= 0 }?.let(mainPagerState::animateToPage) },
                     onClickArticle = { article ->
                         navigator.push(Route.TodayArticle(article.rId))
@@ -183,13 +178,11 @@ fun MainPage(
 
                 MainTab.Updates -> UpdatesTab(
                     viewModel = updatesViewModel,
-                    bottomPadding = bottomPadding,
                     onOpenDetail = openDetail,
                 )
 
                 MainTab.Search -> SearchTab(
                     viewModel = searchViewModel,
-                    bottomPadding = bottomPadding,
                     onOpenDetail = openDetail,
                     isCurrentPage = selectedPage == searchPage,
                     focusRequestId = searchFocusRequestId,
@@ -198,7 +191,6 @@ fun MainPage(
                 MainTab.Settings -> SettingsTab(
                     updatesViewModel = updatesViewModel,
                     installerSettingsViewModel = installerSettingsViewModel,
-                    bottomPadding = bottomPadding,
                     appManagementSupported = appManagementSupported,
                     onNavigateDeviceProfile = { navigator.push(Route.DeviceProfile) },
                     onNavigateInstaller = { navigator.push(Route.InstallerSettings) },
@@ -245,22 +237,25 @@ fun MainPage(
                         WindowInsets.systemBars.union(WindowInsets.displayCutout)
                             .only(WindowInsetsSides.End),
                     ),
-                navigationBottomInset,
             )
         }
     } else {
-        Box(Modifier.fillMaxSize()) {
+        // 固定底栏由 Scaffold 的 bottomBar 持有，内容区自动避让（含系统导航栏内边距）。
+        Scaffold(
+            bottomBar = {
+                MarketNavigationBar(
+                    items = navItems,
+                    selectedIndex = selectedPage,
+                    onSelected = { index -> onTabClick(index, tabs[index]) },
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentWindowInsets = WindowInsets(0),
+        ) { innerPadding ->
             pagerContent(
-                Modifier.fillMaxSize(),
-                NavigationBarHeight + navigationBottomInset + 8.dp,
-            )
-            MarketNavigationBar(
-                items = navItems,
-                selectedIndex = selectedPage,
-                onSelected = { index -> onTabClick(index, tabs[index]) },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars),
+                Modifier
+                    .fillMaxSize()
+                    .padding(bottom = innerPadding.calculateBottomPadding()),
             )
         }
     }

@@ -97,7 +97,6 @@ private val TodayGridMinCellWidth = 320.dp
 @Composable
 fun TodayTab(
     viewModel: TodayViewModel,
-    bottomPadding: Dp,
     onClickArticle: (TodayArticle) -> Unit,
     updatesViewModel: UpdatesViewModel? = null,
     onClickViewUpdates: () -> Unit = {},
@@ -144,7 +143,7 @@ fun TodayTab(
             LoadingBox(
                 Modifier.fillMaxSize().padding(
                     top = statusBarTop + PageVerticalPadding,
-                    bottom = bottomPadding + PageVerticalPadding,
+                    bottom = PageVerticalPadding,
                 ),
             )
             return@Crossfade
@@ -157,7 +156,7 @@ fun TodayTab(
                 start = 16.dp,
                 end = 16.dp,
                 top = statusBarTop + 8.dp,
-                bottom = bottomPadding + PageVerticalPadding,
+                bottom = PageVerticalPadding,
             ),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),

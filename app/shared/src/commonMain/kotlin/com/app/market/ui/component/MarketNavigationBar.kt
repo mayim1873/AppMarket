@@ -10,13 +10,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -43,10 +48,8 @@ data class MarketNavItem(
 )
 
 /**
- * M3E 悬浮导航栏：胶囊形容器 + 选中项药丸指示器，悬浮在内容之上。
- *
- * 未直接使用 `ShortNavigationBar`（alpha 版本在等分排列下只会渲染首项），
- * 这里用 Row 等分 + 动画药丸自绘，行为可预期。
+ * 固定底栏（M3 NavigationBar 形态）：贴底、通栏、随系统导航栏内边距一起占位，
+ * 选中项使用药丸指示器。由外层 Scaffold 的 `bottomBar` 持有，内容区自动避让。
  */
 @Composable
 fun MarketNavigationBar(
@@ -56,29 +59,33 @@ fun MarketNavigationBar(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        shape = RoundedCornerShape(32.dp),
+        modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 3.dp,
         tonalElevation = 0.dp,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items.forEachIndexed { index, item ->
-                NavBarItem(
-                    item = item,
-                    selected = index == selectedIndex,
-                    onClick = { onSelected(index) },
-                    modifier = Modifier.weight(1f),
-                )
+        Column(Modifier.fillMaxWidth()) {
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .heightIn(min = 64.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items.forEachIndexed { index, item ->
+                    NavBarItem(
+                        item = item,
+                        selected = index == selectedIndex,
+                        onClick = { onSelected(index) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
@@ -117,13 +124,13 @@ private fun NavBarItem(
         label = "navLabel",
     )
     val indicatorHorizontalPadding by animateDpAsState(
-        targetValue = if (selected) 18.dp else 12.dp,
+        targetValue = if (selected) 18.dp else 14.dp,
         label = "navIndicatorPadding",
     )
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -136,7 +143,7 @@ private fun NavBarItem(
             modifier = Modifier
                 .clip(RoundedCornerShape(100))
                 .background(indicatorColor)
-                .padding(horizontal = indicatorHorizontalPadding, vertical = 6.dp),
+                .padding(horizontal = indicatorHorizontalPadding, vertical = 5.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (item.badgeCount > 0) {
@@ -163,7 +170,7 @@ private fun NavBarItem(
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(3.dp))
         Text(
             text = item.label,
             style = MaterialTheme.typography.labelSmall,

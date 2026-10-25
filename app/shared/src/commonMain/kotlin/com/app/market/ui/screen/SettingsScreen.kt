@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.market.domain.model.market.AppSource
@@ -94,7 +93,6 @@ import org.jetbrains.compose.resources.stringResource
 fun SettingsTab(
     updatesViewModel: UpdatesViewModel,
     installerSettingsViewModel: InstallerSettingsViewModel,
-    bottomPadding: Dp,
     appManagementSupported: Boolean = true,
     onNavigateDeviceProfile: () -> Unit,
     onNavigateInstaller: () -> Unit,
@@ -132,7 +130,7 @@ fun SettingsTab(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = topPadding + PageVerticalPadding,
-                bottom = bottomPadding + PageVerticalPadding,
+                bottom = PageVerticalPadding,
             ),
         ) {
             item {

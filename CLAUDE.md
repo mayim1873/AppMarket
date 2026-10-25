@@ -16,8 +16,8 @@ Kotlin Multiplatform（Android + Desktop）应用商店客户端，UI 使用 Com
 全局间距体系（常量定义在 [MarketScaffold.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/component/MarketScaffold.kt)）：
 
 - **页面出入距 `PageVerticalPadding` = 12dp**：滚动页面「顶栏底部 → 内容顶部」「内容末尾 → 页面底部」的额外间距，一律引用该常量。
-  - 出入距统一通过列表 `contentPadding` 实现（顶部 `innerPadding.calculateTopPadding() + PageVerticalPadding`、底部 `bottomPadding + PageVerticalPadding`）。
-  - `bottomPadding: Dp` 参数只出现在主 Tab 页签名里（外层 MainScreen 持有悬浮导航栏，需透传其高度）；二级推入页一律用脚手架自身的 `innerPadding`，签名不带 `bottomPadding`。
+  - 出入距统一通过列表 `contentPadding` 实现（顶部 `innerPadding.calculateTopPadding() + PageVerticalPadding`、底部 `innerPadding.calculateBottomPadding() + PageVerticalPadding`）。
+  - 固定底栏由外层 `Scaffold` 的 `bottomBar` 持有，内容区通过 `innerPadding` 自动避让，主 Tab 页签名不再需要 `bottomPadding` 参数；二级推入页一律用脚手架自身的 `innerPadding`。
 - **卡片 / 区块间距 = 20dp**：网格 `spacedBy`、块间距、区块标题上方间距。列表内卡片间距用 12dp。
 - **页面水平内边距 = 16dp**：卡片贴边距 16dp；`SectionTitle` 用 20dp 与卡片内容形成轻微缩进层次。
 - **小标题 `SectionTitle`**：上方 20dp 由标题自身 `topPadding` 提供；标题到内容 8dp；水平 20dp。紧贴顶栏时传 `topPadding = 0.dp`。
@@ -31,7 +31,7 @@ Kotlin Multiplatform（Android + Desktop）应用商店客户端，UI 使用 Com
 - **卡片**：`MarketCard`（28dp 圆角、`surfaceContainerLow` 容器色、无阴影靠色调分层）；被拆成多个 lazy item 的连续卡片用 `CardSegmentContainer(isFirst, isLast)` + `MarketDivider`。
 - **返回按钮统一** `Icons.AutoMirrored.Filled.ArrowBack`（脚手架内已封装）。
 - **图标**：`androidx.compose.material.icons`（`Icons.Filled.*` / `Icons.AutoMirrored.*`）。
-- **宽屏适配**：以 `rememberIsWideScreen()` 为唯一判定；宽屏用 `MarketNavigationRail`，窄屏用 `MarketNavigationBar`（M3E `ShortNavigationBar` 悬浮胶囊导航）。
+- **宽屏适配**：以 `rememberIsWideScreen()` 为唯一判定；宽屏用 `MarketNavigationRail`，窄屏用 `MarketNavigationBar`（M3E NavigationBar 形态的固定底栏，贴在 Scaffold 底部、通栏、含系统导航栏内边距）。
 - **多行卡片拆独立 lazy item**：`CardSegmentContainer` 拼视觉连续卡片，每行独立 item 保证滚动性能。
 - **设置页**：用 `SettingsGroup` / `SettingsRow` / `SettingsSwitchRow` / `SettingsArrowRow` / `SettingsDropdownRow`，不要手写行布局。
 - **长内容 Dialog**：`MarketDialog` 内容用 `heightIn(max = …)` 限高 + 内部 `verticalScroll`，按钮固定底部；确认类弹窗优先 `MarketConfirmDialog`。
