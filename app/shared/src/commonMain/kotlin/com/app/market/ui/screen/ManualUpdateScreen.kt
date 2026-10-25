@@ -4,14 +4,22 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -19,8 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,21 +47,15 @@ import com.app.market.ui.component.AppActionButton
 import com.app.market.ui.component.AppButton
 import com.app.market.ui.component.AppButtonText
 import com.app.market.ui.component.AppIcon
+import com.app.market.ui.component.MarketCard
 import com.app.market.ui.component.MarketScaffold
+import com.app.market.ui.component.PageHorizontalPadding
 import com.app.market.ui.component.PageVerticalPadding
 import com.app.market.ui.model.AppActionKind
 import com.app.market.ui.util.appDisplayName
 import com.app.market.ui.util.formatSize
 import com.app.market.viewmodel.ManualUpdateViewModel
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun ManualUpdateScreen(
@@ -70,39 +70,37 @@ fun ManualUpdateScreen(
     MarketScaffold(
         title = stringResource(Res.string.manual_update),
         onBack = onBack
-    ) { innerPadding, backdropModifier, scrollBehavior ->
-        val layoutDirection = LocalLayoutDirection.current
+    ) { innerPadding, _, scrollBehavior ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .then(backdropModifier)
-                .scrollEndHaptic()
-                .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
-                start = innerPadding.calculateStartPadding(layoutDirection) + 12.dp,
-                end = innerPadding.calculateEndPadding(layoutDirection) + 12.dp,
+                start = PageHorizontalPadding,
+                end = PageHorizontalPadding,
                 top = innerPadding.calculateTopPadding() + PageVerticalPadding,
                 bottom = innerPadding.calculateBottomPadding() + PageVerticalPadding,
             ),
         ) {
             item(key = "package") {
-                TextField(
+                OutlinedTextField(
                     value = state.packageName,
                     onValueChange = viewModel::setPackageName,
-                    label = stringResource(Res.string.manual_update_package),
+                    label = { Text(stringResource(Res.string.manual_update_package)) },
                     singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             item(key = "version") {
-                TextField(
+                OutlinedTextField(
                     value = state.versionCode,
                     onValueChange = viewModel::setVersionCode,
-                    label = stringResource(Res.string.manual_update_version_code),
+                    label = { Text(stringResource(Res.string.manual_update_version_code)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -111,11 +109,15 @@ fun ManualUpdateScreen(
                 AppButton(
                     onClick = viewModel::check,
                     enabled = !state.loading,
-                    colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.fillMaxWidth(),
+                    minHeight = 48.dp,
                 ) {
                     if (state.loading) {
-                        InfiniteProgressIndicator(color = MiuixTheme.colorScheme.onPrimary, size = 18.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = LocalContentColor.current,
+                            strokeWidth = 2.dp,
+                        )
                     } else {
                         AppButtonText(stringResource(Res.string.manual_update_check))
                     }
@@ -124,32 +126,51 @@ fun ManualUpdateScreen(
 
             if (state.errorMessage.isNotBlank()) {
                 item(key = "error") {
-                    Text(
-                        text = state.errorMessage,
-                        color = MiuixTheme.colorScheme.error,
-                        style = MiuixTheme.textStyles.main,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                    MarketCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Text(
+                                text = state.errorMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                    }
                 }
             }
 
             if (state.noApk) {
                 item(key = "no_apk") {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.manual_update_no_apk),
-                            color = MiuixTheme.colorScheme.onSurface,
-                            style = MiuixTheme.textStyles.main,
-                        )
-                        if (state.recognizedNoUpdate) {
-                            Text(
-                                text = stringResource(Res.string.manual_update_recognized_no_update),
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                style = MiuixTheme.textStyles.body2,
+                    MarketCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.primary,
                             )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = stringResource(Res.string.manual_update_no_apk),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                if (state.recognizedNoUpdate) {
+                                    Text(
+                                        text = stringResource(Res.string.manual_update_recognized_no_update),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -188,11 +209,10 @@ private fun ManualUpdateResultCard(
     onInstallDownloaded: (String) -> Unit,
     onCancel: (String) -> Unit,
 ) {
-    Card(
+    MarketCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onOpenDetail,
-        showIndication = true,
-        insideMargin = PaddingValues(16.dp),
+        contentPadding = PaddingValues(16.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -204,44 +224,47 @@ private fun ManualUpdateResultCard(
                 contentDescription = appDisplayName(app.displayName, app.source),
                 size = 58.dp,
             )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = appDisplayName(app.displayName, app.source),
-                    style = MiuixTheme.textStyles.headline1,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    app.packageName,
+                    text = app.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Text(
-                    stringResource(
+                    text = stringResource(
                         Res.string.manual_update_current,
                         "-",
                         currentVersionCode,
                     ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
-                    stringResource(Res.string.manual_update_available, app.versionName, app.versionCode.toString()),
+                    text = stringResource(
+                        Res.string.manual_update_available,
+                        app.versionName,
+                        app.versionCode.toString(),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
                     text = formatSize(app.apkSize),
-                    style = MiuixTheme.textStyles.body2,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             AppActionButton(

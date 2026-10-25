@@ -17,7 +17,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -61,6 +69,7 @@ import com.app.market.resources.no_change_log
 import com.app.market.resources.search_ad_tag
 import com.app.market.resources.search_quickapp_tag
 import com.app.market.ui.model.AppActionKind
+import com.app.market.ui.theme.MarketShapeTokens
 import com.app.market.ui.util.allowColorSampling
 import com.app.market.ui.util.appDisplayName
 import com.app.market.ui.util.appSourceLabel
@@ -69,20 +78,9 @@ import com.app.market.ui.util.formatSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardColors
-import top.yukonga.miuix.kmp.basic.DropdownImpl
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
-import top.yukonga.miuix.kmp.squircle.squircleBorder
-import top.yukonga.miuix.kmp.squircle.squircleClip
-import top.yukonga.miuix.kmp.squircle.squircleSurface
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import coil3.Image as CoilImage
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppAsyncImage(
     url: String,
@@ -113,7 +111,7 @@ fun AppAsyncImage(
         }
     }
     var loading by remember(url) { mutableStateOf(true) }
-    // onSuccess 在主线程，而取色要做整图位图拷贝
+    // onSuccess 在主线程，而取色要做整图位图拷贝。
     var sampledImage by remember(url) { mutableStateOf<CoilImage?>(null) }
     val currentOnDominantColor by rememberUpdatedState(onDominantColor)
     val currentOnLoaded by rememberUpdatedState(onLoaded)
@@ -141,7 +139,12 @@ fun AppAsyncImage(
     if (showLoadingIndicator) {
         Box(modifier = modifier, contentAlignment = loadingIndicatorAlignment) {
             image(Modifier.matchParentSize())
-            if (loading) InfiniteProgressIndicator(color = loadingIndicatorColor)
+            if (loading) {
+                LoadingIndicator(
+                    modifier = Modifier.size(32.dp),
+                    color = loadingIndicatorColor,
+                )
+            }
         }
     } else {
         image(modifier)
@@ -160,8 +163,7 @@ fun AppIcon(
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
-            .squircleBorder(0.2.dp, Color.Gray, size * 0.25f)
-            .squircleClip(size * 0.25f),
+            .clip(RoundedCornerShape(MarketShapeTokens.IconCorner)),
     )
 }
 
@@ -190,18 +192,9 @@ fun RelatedAppsCard(
     onOpenApp: (MarketAppInfo) -> Unit,
     title: (MarketAppInfo) -> String = { app -> app.displayName },
     summary: (MarketAppInfo) -> String,
-    colors: CardColors = CardColors(
-        MiuixTheme.colorScheme.surface,
-        MiuixTheme.colorScheme.onSurface
-    ),
     action: @Composable (MarketAppInfo) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        cornerRadius = 16.dp,
-        colors = colors,
-        insideMargin = PaddingValues(0.dp),
-    ) {
+    MarketCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             apps.forEach { app ->
                 RelatedAppRow(
@@ -228,7 +221,7 @@ fun RelatedAppRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpenApp)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(
@@ -236,7 +229,7 @@ fun RelatedAppRow(
             contentDescription = appDisplayName(app.displayName, app.source),
             size = 48.dp,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(12.dp))
         Box(modifier = Modifier.weight(1f)) {
             Column(
                 modifier = Modifier
@@ -245,16 +238,14 @@ fun RelatedAppRow(
             ) {
                 Text(
                     text = appDisplayName(title, app.source),
-                    color = MiuixTheme.colorScheme.onSurface,
-                    style = MiuixTheme.textStyles.headline1,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = summary,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    style = MiuixTheme.textStyles.body2,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -265,12 +256,15 @@ fun RelatedAppRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LoadingBox(modifier: Modifier = Modifier) {
-    // Default fills width only (wrap height); pass Modifier.fillParentMaxSize() from a LazyColumn
-    // item to truly center the spinner in the viewport instead of pinning it to the top.
-    Box(modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-        InfiniteProgressIndicator()
+    // 默认只填满宽度（高度自适应）；在 LazyColumn item 里传 Modifier.fillParentMaxSize() 可真正居中。
+    Box(modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+        LoadingIndicator(
+            modifier = Modifier.size(36.dp),
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
@@ -307,13 +301,12 @@ fun AppRow(
         }
     } else null
     var changeLogExpanded by rememberSaveable(app.packageName, app.versionCode) {
-        mutableStateOf(
-            initialChangeLogExpanded
-        )
+        mutableStateOf(initialChangeLogExpanded)
     }
     val noChangeLogText = stringResource(Res.string.no_change_log)
     val versionSizeText = remember(app) { appVersionSizeText(app) }
     val spSize = with(LocalDensity.current) { 1.sp.toDp() }
+
     val content: @Composable () -> Unit = {
         Box(
             modifier = if (showUpdateLog && !changeLogExpanded) {
@@ -338,27 +331,21 @@ fun AppRow(
             }
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(if (grouped) 8.dp else 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (grouped) 8.dp else 14.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 AppIcon(
                     url = app.icon,
                     contentDescription = appDisplayName(app.displayName, app.source),
                     size = if (grouped) 48.dp else 52 * spSize,
-                    modifier = Modifier
-                        .padding(
-                            start = if (grouped) 0.dp else 3 * spSize,
-                            top = if (grouped) 0.dp else 3 * spSize
-                        ),
                 )
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            appDisplayName(app.displayName, app.source),
+                            text = appDisplayName(app.displayName, app.source),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MiuixTheme.textStyles.headline1,
-                            fontWeight = FontWeight.Medium,
+                            style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f, fill = false),
                         )
                         if (showSourceTag) {
@@ -382,11 +369,11 @@ fun AppRow(
                     }
                     if (showUpdateLog) {
                         Text(
-                            versionSizeText,
+                            text = versionSizeText,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         UpdateChangeLogText(
                             text = app.changeLog.ifBlank { noChangeLogText },
@@ -397,18 +384,18 @@ fun AppRow(
                         )
                     } else {
                         Text(
-                            app.publisherName.ifBlank { app.packageName },
+                            text = app.publisherName.ifBlank { app.packageName },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            versionSizeText,
+                            text = versionSizeText,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -422,9 +409,8 @@ fun AppRow(
                     onResumeDownload = onResumeDownload,
                     onInstallDownloaded = onInstallDownloaded,
                     onCancel = onCancel,
-                    minHeight = 34.dp,
-                    insideMargin = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                    modifier = Modifier.padding(top = (29 * spSize - 17.dp)),
+                    minHeight = 36.dp,
+                    insideMargin = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
                 )
             }
         }
@@ -437,39 +423,35 @@ fun AppRow(
                     onClick = onOpenDetail,
                     onLongClick = onRowLongPress,
                 )
-                .padding(13.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             content()
         }
     } else {
-        Card(
+        MarketCard(
             modifier = modifier.fillMaxWidth(),
             onClick = onOpenDetail,
-            onLongPress = onRowLongPress,
-            showIndication = true,
-            holdDownState = showMenu.value,
-            insideMargin = PaddingValues(all = 13.dp),
+            onLongClick = onRowLongPress,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
         ) {
             content()
         }
     }
 }
 
-/** Small muted tag shown after the app name for search-result markers (promoted / quick app). */
+/** 搜索结果的来源 / 推广 / 快应用小标签。 */
 @Composable
 private fun SearchTag(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        style = MiuixTheme.textStyles.footnote2,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        style = MaterialTheme.typography.labelSmall,
         maxLines = 1,
         softWrap = false,
         modifier = modifier
-            .squircleSurface(
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.15f),
-                cornerRadius = 5.dp,
-            )
-            .padding(horizontal = 5.dp, vertical = 1.dp),
+            .clip(RoundedCornerShape(MarketShapeTokens.TagCorner))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }
 
@@ -482,9 +464,9 @@ private fun UpdateChangeLogText(
     onLongPress: (() -> Unit)?,
 ) {
     val textMeasurer = rememberTextMeasurer()
-    val style = MiuixTheme.textStyles.body2
-    val bodyColor = MiuixTheme.colorScheme.onSurfaceVariantSummary
-    val actionColor = MiuixTheme.colorScheme.primary
+    val style = MaterialTheme.typography.bodySmall
+    val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val actionColor = MaterialTheme.colorScheme.primary
     val expandText = stringResource(Res.string.expand_change_log)
     val collapseText = stringResource(Res.string.collapse_change_log)
 
@@ -558,7 +540,7 @@ private fun UpdateChangeLogText(
                                 Brush.horizontalGradient(
                                     listOf(
                                         Color.Transparent,
-                                        MiuixTheme.colorScheme.surfaceVariant
+                                        MaterialTheme.colorScheme.surfaceContainerLow,
                                     ),
                                 ),
                             ),
@@ -569,7 +551,7 @@ private fun UpdateChangeLogText(
                             color = actionColor,
                             onClick = { onExpandedChange(true) },
                             onLongPress = onLongPress,
-                            modifier = Modifier.background(MiuixTheme.colorScheme.surfaceVariant),
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow),
                         )
                     }
                 }
@@ -613,7 +595,7 @@ private fun ChangeLogActionText(
 ) {
     BasicText(
         text = text,
-        style = style.copy(color = color),
+        style = style.copy(color = color, fontWeight = FontWeight.SemiBold),
         maxLines = 1,
         overflow = TextOverflow.Clip,
         modifier = modifier.pointerInput(text, onClick, onLongPress) {
@@ -653,26 +635,14 @@ internal fun IgnoreUpdateMenu(
 ) {
     val onceText = stringResource(Res.string.ignore_once)
     val permanentText = stringResource(Res.string.ignore_permanent)
-    OverlayListPopup(
-        show = show,
-        alignment = PopupPositionProvider.Align.End,
-        onDismissRequest = onDismiss,
-    ) {
-        ListPopupColumn {
-            DropdownImpl(
-                text = onceText,
-                optionSize = 2,
-                isSelected = false,
-                index = 0,
-                onSelectedIndexChange = { onIgnoreOnce() },
-            )
-            DropdownImpl(
-                text = permanentText,
-                optionSize = 2,
-                isSelected = false,
-                index = 1,
-                onSelectedIndexChange = { onIgnorePermanent() },
-            )
-        }
+    DropdownMenu(expanded = show, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(onceText) },
+            onClick = onIgnoreOnce,
+        )
+        DropdownMenuItem(
+            text = { Text(permanentText) },
+            onClick = onIgnorePermanent,
+        )
     }
 }

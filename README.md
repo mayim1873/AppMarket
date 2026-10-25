@@ -1,10 +1,10 @@
 # AppMarket
 
-基于 **Kotlin Multiplatform** 的现代化跨平台应用商店，支持 **Android** 与 **Desktop (JVM)**。采用 **miuix** 设计语言，拥有流畅优雅的视觉交互，聚合多家主流应用源。
+基于 **Kotlin Multiplatform** 的现代化跨平台应用商店，支持 **Android** 与 **Desktop (JVM)**。采用 **Material 3 Expressive** 设计语言（动态取色、大圆角与弹簧动效），聚合多家主流应用源。
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4.10-blue.svg?logo=kotlin)](https://kotlinlang.org)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.12.0-blue?logo=jetpackcompose)](https://github.com/JetBrains/compose-multiplatform)
-[![miuix](https://img.shields.io/badge/UI-miuix-FF6900.svg)](https://github.com/compose-miuix-ui/miuix)
+[![Material 3 Expressive](https://img.shields.io/badge/UI-Material%203%20Expressive-6750A4.svg?logo=materialdesign)](https://m3.material.io/)
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Desktop-green.svg)](https://github.com/YuKongA/AppMarket)
 [![Android Min SDK](<https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-brightgreen.svg?logo=android>)](https://android.com)
 [![JDK](https://img.shields.io/badge/JDK-21-orange.svg?logo=openjdk)](https://openjdk.org)
@@ -142,7 +142,7 @@
 ## 开源引用
 
 - [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform) - JetBrains 推出的声明式跨平台 UI 框架
-- [miuix](https://github.com/compose-miuix-ui/miuix) - 遵循 MIUI / HyperOS 设计风格的 Compose Multiplatform UI 库
+- [Material 3 Expressive](https://m3.material.io/) - Google Material Design 3 表现力设计体系（`androidx.compose.material3`）
 - [Ktor](https://github.com/ktorio/ktor) - 现代化异步多平台 HTTP 客户端
 - [Koin](https://github.com/InsertKoinIO/koin) - 轻量级依赖注入框架
 - [Coil](https://github.com/coil-kt/coil) - Kotlin Multiplatform 异步图片加载库

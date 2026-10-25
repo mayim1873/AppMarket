@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,9 +15,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -50,8 +59,9 @@ import com.app.market.resources.update_history_clear
 import com.app.market.resources.update_history_clear_confirm
 import com.app.market.resources.update_history_first_install
 import com.app.market.ui.component.AppIcon
-import com.app.market.ui.component.AppTextButton
 import com.app.market.ui.component.CardSegmentContainer
+import com.app.market.ui.component.MarketConfirmDialog
+import com.app.market.ui.component.MarketDivider
 import com.app.market.ui.component.MarketScaffold
 import com.app.market.ui.component.PageVerticalPadding
 import com.app.market.ui.component.SectionTitle
@@ -65,16 +75,6 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /** 同一天的历史记录分组（[entries] 保持新→旧）。 */
 private data class HistoryDayGroup(val date: LocalDate, val entries: List<UpdateHistoryEntry>)
@@ -93,14 +93,10 @@ fun UpdateHistoryScreen(
         onBack = onBack,
         actions = {
             if (entries.isNotEmpty()) {
-                IconButton(
-                    onClick = { showClearDialog = true },
-                    holdDownState = showClearDialog,
-                ) {
+                IconButton(onClick = { showClearDialog = true }) {
                     Icon(
-                        imageVector = MiuixIcons.Delete,
+                        imageVector = Icons.Filled.Delete,
                         contentDescription = stringResource(Res.string.update_history_clear),
-                        tint = MiuixTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -115,8 +111,6 @@ fun UpdateHistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .then(backdropModifier)
-                .scrollEndHaptic()
-                .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 start = innerPadding.calculateStartPadding(layoutDirection),
@@ -131,11 +125,22 @@ fun UpdateHistoryScreen(
                         modifier = Modifier.fillParentMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            stringResource(Res.string.no_update_history),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            style = MiuixTheme.textStyles.main,
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.History,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = stringResource(Res.string.no_update_history),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -156,36 +161,28 @@ fun UpdateHistoryScreen(
                         modifier = Modifier.animateItem(placementSpec = null),
                     ) {
                         HistoryRow(entry = entry, onOpenDetail = onOpenDetail)
+                        if (index != group.entries.lastIndex) {
+                            MarketDivider(startPadding = 16.dp)
+                        }
                     }
                 }
             }
         }
     }
 
-    WindowDialog(
+    MarketConfirmDialog(
         show = showClearDialog,
         title = stringResource(Res.string.update_history_clear),
-        summary = stringResource(Res.string.update_history_clear_confirm),
-        onDismissRequest = { showClearDialog = false },
-    ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            AppTextButton(
-                modifier = Modifier.weight(1f),
-                text = stringResource(Res.string.cancel),
-                onClick = { showClearDialog = false },
-            )
-            Spacer(Modifier.width(16.dp))
-            AppTextButton(
-                modifier = Modifier.weight(1f),
-                text = stringResource(Res.string.confirm),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-                onClick = {
-                    viewModel.clear()
-                    showClearDialog = false
-                },
-            )
-        }
-    }
+        message = stringResource(Res.string.update_history_clear_confirm),
+        confirmText = stringResource(Res.string.confirm),
+        onConfirm = {
+            viewModel.clear()
+            showClearDialog = false
+        },
+        onDismiss = { showClearDialog = false },
+        dismissText = stringResource(Res.string.cancel),
+        destructive = true,
+    )
 }
 
 @Composable
@@ -222,27 +219,27 @@ private fun HistoryRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     text = appDisplayName(entry.displayName, entry.source),
-                    style = MiuixTheme.textStyles.headline1,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    if (entry.previousVersionName.isEmpty()) {
+                    text = if (entry.previousVersionName.isEmpty()) {
                         stringResource(Res.string.update_history_first_install, entry.versionName)
                     } else {
                         "${entry.previousVersionName} → ${entry.versionName}"
                     },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             Text(
-                formatTimeHm(entry.installedAt),
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                text = formatTimeHm(entry.installedAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (entry.changeLog.isNotBlank()) {
@@ -254,12 +251,12 @@ private fun HistoryRow(
             val collapsedChangeLog = remember(entry.changeLog) {
                 entry.changeLog.replace(WhitespaceRegex, " ").trim()
             }
-            val changeLogStyle = MiuixTheme.textStyles.body2
+            val changeLogStyle = MaterialTheme.typography.bodySmall
             Box(Modifier.fillMaxWidth()) {
                 Text(
                     text = if (expanded) entry.changeLog else collapsedChangeLog,
                     style = changeLogStyle,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = if (expanded) Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Clip,
                     onTextLayout = { result ->
@@ -281,14 +278,17 @@ private fun HistoryRow(
                             Modifier.width(58.dp).fillMaxHeight().background(
                                 Brush.horizontalGradient(
                                     0f to Color.Transparent,
-                                    1f to MiuixTheme.colorScheme.surfaceContainer,
+                                    1f to MaterialTheme.colorScheme.surfaceContainerLow,
                                 ),
                             ),
                         )
                         Text(
                             text = stringResource(Res.string.expand_change_log),
-                            modifier = Modifier.background(MiuixTheme.colorScheme.surfaceContainer),
-                            color = MiuixTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(horizontal = 4.dp),
+                            color = MaterialTheme.colorScheme.primary,
                             style = changeLogStyle,
                         )
                     }
@@ -299,11 +299,13 @@ private fun HistoryRow(
                     text = stringResource(Res.string.collapse_change_log),
                     modifier = Modifier
                         .align(Alignment.End)
+                        .clip(RoundedCornerShape(8.dp))
                         .clickable(interactionSource = null, indication = null) {
                             expanded = false
-                        },
-                    color = MiuixTheme.colorScheme.primary,
-                    style = changeLogStyle,
+                        }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
         }

@@ -21,36 +21,51 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.offset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
@@ -67,33 +82,16 @@ import com.app.market.resources.reserve
 import com.app.market.resources.search_hint
 import com.app.market.resources.search_history
 import com.app.market.resources.update
-import com.app.market.ui.component.AdaptiveTopAppBar
 import com.app.market.ui.component.AppRow
 import com.app.market.ui.component.LoadingBox
 import com.app.market.ui.component.PageVerticalPadding
-import com.app.market.ui.component.blur.BlurredBar
-import com.app.market.ui.component.blur.rememberBlurBackdrop
 import com.app.market.ui.model.AppActionKind
+import com.app.market.ui.theme.MarketShapeTokens
 import com.app.market.ui.util.installActionText
-import com.app.market.ui.util.rememberIsWideScreen
 import com.app.market.viewmodel.SearchUiState
 import com.app.market.viewmodel.SearchViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.InputField
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.squircle.squircleSurface
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -108,8 +106,7 @@ fun SearchTab(
     val downloadStates = viewModel.downloadStates.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // Infinite scroll: fire on entering the bottom zone; distinctUntilChanged stops a stale "at bottom"
-    // from re-firing after a new search.
+    // 无限滚动：进入底部区域时触发；distinctUntilChanged 避免新搜索后旧的「已到底」状态重复触发。
     LaunchedEffect(listState) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -119,19 +116,11 @@ fun SearchTab(
             .distinctUntilChanged()
             .collect { atBottom -> if (atBottom) viewModel.loadMore() }
     }
-    // Reset scroll to top on every completed search (epoch changes even for a same-keyword re-search).
+    // 每次搜索完成回到顶部（searchEpoch 变化，同关键词重搜也会触发）。
     LaunchedEffect(state.searchEpoch) {
         if (state.searchEpoch > 0) listState.scrollToItem(0)
     }
 
-    val scrollBehavior = MiuixScrollBehavior()
-    val isWideScreen = rememberIsWideScreen()
-    // 大标题折叠时把搜索框上方 12dp 收到 0；宽屏顶栏不折叠，恒为 0
-    val collapsingTopPadding = Modifier.collapsingTopPadding(
-        max = if (isWideScreen) 0.dp else 12.dp,
-        fraction = { scrollBehavior.state.collapsedFraction },
-    )
-    var searchExpanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val focusManager = LocalFocusManager.current
@@ -142,19 +131,12 @@ fun SearchTab(
     LaunchedEffect(focusRequestId) {
         if (isCurrentPage && focusRequestId != handledFocusRequestId) {
             handledFocusRequestId = focusRequestId
-            searchExpanded = true
-            // Let InputField apply its expanded state before requesting focus. This is required by
-            // its Android 8 focus workaround, which temporarily disables the collapsed text field.
-            withFrameNanos { }
             focusRequester.requestFocus()
             keyboardController?.show()
         }
     }
 
-    // A search is "active" when the field is actually focused or a keyword is present (e.g. searched
-    // via a history chip, which does not focus the field). Using the real focus state (not the
-    // sticky `searchExpanded`, which only flips true on focus gain) keeps the cancel button and the
-    // Back gating from sticking after focus is lost.
+    // 搜索「激活」判定：输入框聚焦或已有关键词（例如点历史词触发，输入框并未聚焦）。
     val searchActive = isFocused || state.keyword.isNotEmpty()
     val dismissSearchInput: () -> Unit = {
         focusManager.clearFocus()
@@ -162,12 +144,10 @@ fun SearchTab(
     }
     val cancelSearch: () -> Unit = {
         viewModel.clearSearch()
-        searchExpanded = false
         dismissSearchInput()
     }
 
-    // While a search is active, Back clears it first (taking priority over the pager's
-    // back-to-home handler); only once there is no active search does Back fall through.
+    // 搜索激活时，返回键先清空搜索（优先于 pager 的返回首页）。
     val backState = rememberNavigationEventState(NavigationEventInfo.None)
     NavigationBackHandler(
         state = backState,
@@ -175,114 +155,154 @@ fun SearchTab(
         onBackCompleted = cancelSearch,
     )
 
-    val backdrop = rememberBlurBackdrop()
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val contentPadding = PaddingValues(
+        start = 16.dp,
+        end = 16.dp,
+        top = PageVerticalPadding,
+        bottom = bottomPadding + PageVerticalPadding,
+    )
 
     Scaffold(
         topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(Res.string.nav_search),
-                    color = barColor,
-                    scrollBehavior = scrollBehavior,
-                    bottomContent = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            InputField(
-                                query = state.keyword,
-                                onQueryChange = viewModel::setKeyword,
-                                onSearch = {
-                                    viewModel.runSearch()
-                                    dismissSearchInput()
-                                },
-                                expanded = searchExpanded,
-                                onExpandedChange = { searchExpanded = it },
-                                label = stringResource(Res.string.search_hint),
-                                interactionSource = interactionSource,
-                                modifier = Modifier
-                                    .focusRequester(focusRequester)
-                                    .weight(1f)
-                                    .padding(horizontal = 12.dp)
-                                    .padding(bottom = 6.dp).then(collapsingTopPadding),
-                            )
-                            AnimatedVisibility(
-                                visible = searchActive,
-                                enter = expandHorizontally() + fadeIn(),
-                                exit = shrinkHorizontally() + fadeOut(),
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.cancel),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MiuixTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .padding(start = 4.dp, end = 16.dp)
-                                        .padding(bottom = 6.dp).then(collapsingTopPadding)
-                                        .clickable(interactionSource = null, indication = null, onClick = cancelSearch),
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        val backdropModifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier
-        val contentPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
-            top = innerPadding.calculateTopPadding() + PageVerticalPadding,
-            bottom = bottomPadding + PageVerticalPadding,
-        )
-        Box(Modifier.fillMaxHeight()) {
-            Crossfade(
-                targetState = state.loading && state.results.isEmpty(),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(backdropModifier),
-                label = "search",
-            ) { fullScreenLoading ->
-                if (fullScreenLoading) {
-                    LoadingBox(Modifier.fillMaxSize().padding(contentPadding))
-                } else {
-                    SearchResultsList(
-                        state = state,
-                        listState = listState,
-                        downloadStates = downloadStates,
-                        contentPadding = contentPadding,
-                        scrollBehavior = scrollBehavior,
-                        viewModel = viewModel,
-                        onSearchHistory = { item ->
-                            viewModel.searchWith(item)
-                            dismissSearchInput()
-                        },
-                        onOpenDetail = onOpenDetail,
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(Res.string.nav_search),
+                        style = MaterialTheme.typography.titleLarge,
                     )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .imePadding(),
+        ) {
+            SearchField(
+                keyword = state.keyword,
+                onKeywordChange = viewModel::setKeyword,
+                onSearch = {
+                    viewModel.runSearch()
+                    dismissSearchInput()
+                },
+                searchActive = searchActive,
+                onCancel = cancelSearch,
+                focusRequester = focusRequester,
+                interactionSource = interactionSource,
+            )
+            Box(Modifier.fillMaxHeight()) {
+                Crossfade(
+                    targetState = state.loading && state.results.isEmpty(),
+                    modifier = Modifier.fillMaxSize(),
+                    label = "search",
+                ) { fullScreenLoading ->
+                    if (fullScreenLoading) {
+                        LoadingBox(Modifier.fillMaxSize().padding(contentPadding))
+                    } else {
+                        SearchResultsList(
+                            state = state,
+                            listState = listState,
+                            downloadStates = downloadStates,
+                            contentPadding = contentPadding,
+                            scrollBehavior = scrollBehavior,
+                            viewModel = viewModel,
+                            onSearchHistory = { item ->
+                                viewModel.searchWith(item)
+                                dismissSearchInput()
+                            },
+                            onOpenDetail = onOpenDetail,
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
-/** 顶部留白按 [fraction] 从 [max] 收到 0，在布局阶段求值，组合不订阅折叠进度。 */
-private fun Modifier.collapsingTopPadding(max: Dp, fraction: () -> Float): Modifier = layout { measurable, constraints ->
-    val extra = (max.toPx() * (1f - fraction())).roundToInt().coerceAtLeast(0)
-    val placeable = measurable.measure(constraints.offset(vertical = -extra))
-    layout(placeable.width, placeable.height + extra) {
-        placeable.place(0, extra)
+/** M3E 搜索框：28dp 圆角、搜索图标 + 清除按钮，取消按钮随搜索激活状态展开。 */
+@Composable
+private fun SearchField(
+    keyword: String,
+    onKeywordChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    searchActive: Boolean,
+    onCancel: () -> Unit,
+    focusRequester: FocusRequester,
+    interactionSource: MutableInteractionSource,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = keyword,
+            onValueChange = onKeywordChange,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            singleLine = true,
+            shape = RoundedCornerShape(28.dp),
+            placeholder = {
+                Text(
+                    text = stringResource(Res.string.search_hint),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                )
+            },
+            trailingIcon = {
+                if (keyword.isNotEmpty()) {
+                    IconButton(onClick = { onKeywordChange("") }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = null,
+                        )
+                    }
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            interactionSource = interactionSource,
+        )
+        AnimatedVisibility(
+            visible = searchActive,
+            enter = expandHorizontally() + fadeIn(),
+            exit = shrinkHorizontally() + fadeOut(),
+        ) {
+            TextButton(onClick = onCancel) {
+                Text(
+                    text = stringResource(Res.string.cancel),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SearchResultsList(
     state: SearchUiState,
     listState: LazyListState,
     downloadStates: State<Map<String, DownloadState>>,
     contentPadding: PaddingValues,
-    scrollBehavior: ScrollBehavior,
+    scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
     viewModel: SearchViewModel,
     onSearchHistory: (String) -> Unit,
     onOpenDetail: (MarketAppInfo) -> Unit,
@@ -296,29 +316,26 @@ private fun SearchResultsList(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .scrollEndHaptic()
-            .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = contentPadding,
     ) {
-        // Compact spinner only for a re-search (results present) — a fresh search uses the centered
-        // full-screen one; the gate also prevents a stray spinner mid-Crossfade (loading true, no results).
+        // 结果已存在时的紧凑 spinner；首次搜索用全屏居中版本。
         if (state.loading && state.results.isNotEmpty()) item(key = "loading") { LoadingBox() }
         if (state.errorMessage.isNotEmpty()) {
             item(key = "error") {
                 Text(
-                    state.errorMessage,
-                    color = MiuixTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(horizontal = 4.dp)
+                    text = state.errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         } else if (state.showNoResults) {
             item(key = "empty") {
                 Text(
-                    noResults,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
+                    text = noResults,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
             }
         }
@@ -327,25 +344,17 @@ private fun SearchResultsList(
             item(key = "history") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            stringResource(Res.string.search_history),
-                            style = MiuixTheme.textStyles.title4,
-                            fontWeight = FontWeight.SemiBold
+                            text = stringResource(Res.string.search_history),
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                        Text(
-                            text = stringResource(Res.string.clear_history),
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.primary,
-                            modifier = Modifier.clickable(
-                                interactionSource = null,
-                                indication = null,
-                                onClick = viewModel::clearHistory,
-                            ),
-                        )
+                        TextButton(onClick = viewModel::clearHistory) {
+                            Text(text = stringResource(Res.string.clear_history))
+                        }
                     }
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -354,43 +363,13 @@ private fun SearchResultsList(
                     ) {
                         state.history.forEach { item ->
                             val selected = state.selectedHistory == item
-                            Box(
-                                modifier = Modifier
-                                    .squircleSurface(
-                                        color = MiuixTheme.colorScheme.surfaceContainer,
-                                        cornerRadius = 14.dp,
-                                    )
-                                    .combinedClickable(
-                                        onClick = { onSearchHistory(item) },
-                                        onLongClick = { viewModel.selectHistory(item) },
-                                    ),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(item, style = MiuixTheme.textStyles.body1)
-                                    AnimatedVisibility(
-                                        visible = selected,
-                                        enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-                                        exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
-                                    ) {
-                                        Icon(
-                                            imageVector = MiuixIcons.Close,
-                                            contentDescription = null,
-                                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                            modifier = Modifier
-                                                .clickable(
-                                                    interactionSource = null,
-                                                    indication = null,
-                                                    onClick = { viewModel.removeHistory(item) },
-                                                )
-                                                .padding(start = 8.dp)
-                                                .size(13.dp),
-                                        )
-                                    }
-                                }
-                            }
+                            HistoryChip(
+                                text = item,
+                                selected = selected,
+                                onClick = { onSearchHistory(item) },
+                                onLongClick = { viewModel.selectHistory(item) },
+                                onRemove = { viewModel.removeHistory(item) },
+                            )
                         }
                     }
                 }
@@ -405,7 +384,7 @@ private fun SearchResultsList(
             }
             AppRow(
                 app = app,
-                modifier = Modifier.animateItem(placementSpec = null),
+                modifier = Modifier.animateItem(),
                 actionText = when (item.actionKind) {
                     AppActionKind.INSTALL -> installText
                     AppActionKind.UPDATE -> updateText
@@ -426,6 +405,50 @@ private fun SearchResultsList(
 
         if (state.loadingMore) {
             item(key = "loadmore") { LoadingBox() }
+        }
+    }
+}
+
+/** 搜索历史胶囊：长按选中后可删除。 */
+@Composable
+private fun HistoryChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(MarketShapeTokens.TagCorner),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
+            AnimatedVisibility(
+                visible = selected,
+                enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
+                exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clickable(onClick = onRemove)
+                        .padding(start = 8.dp)
+                        .size(14.dp),
+                )
+            }
         }
     }
 }

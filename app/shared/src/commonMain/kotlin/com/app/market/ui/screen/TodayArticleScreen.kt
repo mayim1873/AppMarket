@@ -1,41 +1,64 @@
 package com.app.market.ui.screen
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,12 +69,16 @@ import com.app.market.domain.model.market.MarketAppInfo
 import com.app.market.domain.model.today.TodayArticle
 import com.app.market.domain.model.today.TodayArticleBlock
 import com.app.market.resources.Res
+import com.app.market.resources.back
 import com.app.market.resources.golden_award
 import com.app.market.ui.component.AppAsyncImage
 import com.app.market.ui.component.AppButton
+import com.app.market.ui.component.AppButtonColors
+import com.app.market.ui.component.AppButtonDefaults
 import com.app.market.ui.component.AppIcon
-import com.app.market.ui.component.CollapsibleMarketScaffold
 import com.app.market.ui.component.LoadingBox
+import com.app.market.ui.component.MarketCard
+import com.app.market.ui.component.PageVerticalPadding
 import com.app.market.ui.component.RelatedAppsList
 import com.app.market.ui.util.allowColorSampling
 import com.app.market.ui.util.appDisplayName
@@ -65,19 +92,21 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.squircle.squircleBorder
-import top.yukonga.miuix.kmp.squircle.squircleClip
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import kotlin.time.Duration.Companion.milliseconds
 
 // 头图预载最长等待，超时照常揭示
 private const val ARTICLE_HEADER_IMAGE_WAIT_MS = 8_000L
 
+/** 头图高度：编辑类 / 单应用文章。 */
+private val ArticleHeroHeight = 447.dp
+
+/** 头图高度：多应用合辑（底部还要放应用图标行）。 */
+private val GroupHeroHeight = 509.dp
+
+/** 顶栏标题开始淡入的滚动距离。 */
+private val TopBarCollapseDistance = 160.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayArticleScreen(
     rId: String,
@@ -103,7 +132,7 @@ fun TodayArticleScreen(
         ?: article?.apps?.singleOrNull()?.displayName
     val awardLabel = todayAwardLabel(awardName, title, appName)
     val collapsedTitle = awardLabel
-    val defaultAccentColor = MiuixTheme.colorScheme.primary
+    val defaultAccentColor = MaterialTheme.colorScheme.primary
     var accentColor by remember(article?.headerImage, defaultAccentColor) {
         mutableStateOf(defaultAccentColor)
     }
@@ -146,89 +175,175 @@ fun TodayArticleScreen(
         }
     }
 
-    CollapsibleMarketScaffold(
-        title = collapsedTitle,
-        onBack = onBack,
-        expandedContentBehindToolbar = true,
-        expandedNavigationIconTint = MiuixTheme.colorScheme.onPrimary,
-        showNavigationIcon = !isDeveloperLecture,
-        applyWindowInsets = applyWindowInsets,
-        expandedContent = {
-            article?.takeIf { contentRevealed }?.let { currentArticle ->
-                when (currentArticle.apps.size) {
-                    0 -> if (currentArticle.headerImage.isNotBlank()) {
-                        EditorialArticleHeader(
-                            imageUrl = currentArticle.headerImage,
-                            placeholderImageUrl = currentArticle.headerImagePreview,
-                            awardLabel = awardLabel,
-                            title = title,
-                            reason = summary,
-                            showTitleLabel = currentArticle.showTitleLabel,
-                            showCoverText = currentArticle.showCoverText,
-                            accentColor = accentColor,
-                            onAccentColor = { accentColor = it },
-                        )
-                    }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val collapseDistancePx = with(LocalDensity.current) { TopBarCollapseDistance.toPx() }
+    // 逐帧变化的滚动进度只以 State 传递，读取下沉到 graphicsLayer / drawBehind，避免整页重组
+    val collapseProgress = remember(lazyListState, collapseDistancePx) {
+        derivedStateOf {
+            when {
+                lazyListState.firstVisibleItemIndex > 0 -> 1f
+                else -> (lazyListState.firstVisibleItemScrollOffset / collapseDistancePx)
+                    .coerceIn(0f, 1f)
+            }
+        }
+    }
+    val bottomInset = if (applyWindowInsets) {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    } else {
+        0.dp
+    }
 
-                    1 -> SingleArticleHeader(
-                        imageUrl = currentArticle.headerImage,
-                        placeholderImageUrl = currentArticle.headerImagePreview,
-                        awardLabel = awardLabel,
-                        title = title,
-                        reason = summary,
-                        showTitleLabel = currentArticle.showTitleLabel,
-                        showCoverText = currentArticle.showCoverText,
-                        app = currentArticle.apps.first(),
-                        accentColor = accentColor,
-                        onAccentColor = { accentColor = it },
-                        onOpenApp = onOpenApp
-                    )
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            ArticleTopBar(
+                title = collapsedTitle,
+                onBack = onBack,
+                showNavigationIcon = !isDeveloperLecture,
+                // 开发者讲座没有封面文案，标题不能等滚动后才出现
+                titleAlwaysVisible = isDeveloperLecture,
+                scrollBehavior = scrollBehavior,
+                collapseProgress = collapseProgress,
+            )
+        },
+        contentWindowInsets = if (applyWindowInsets) {
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+        } else {
+            WindowInsets(0, 0, 0, 0)
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { innerPadding ->
+        when {
+            state.articleLoading ||
+                    (article == null && state.articleError.isBlank()) ||
+                    (article != null && !contentRevealed) ->
+                ArticleLoadingState(safePadding = innerPadding)
 
-                    else -> GroupArticleHeader(
-                        imageUrl = currentArticle.headerImage,
-                        placeholderImageUrl = currentArticle.headerImagePreview,
-                        title = title,
-                        summary = summary,
-                        apps = currentArticle.apps,
-                        accentColor = accentColor,
-                        onAccentColor = { accentColor = it },
+            article == null -> ArticleErrorState(
+                message = state.articleError,
+                safePadding = innerPadding,
+            )
+
+            else -> {
+                val currentArticle = article
+                val bodyBlocks = remember(currentArticle.blocks, currentArticle.apps) {
+                    orderedArticleBlocks(currentArticle).withoutBoundaryImages()
+                }
+                ArticleContent(
+                    bodyBlocks = bodyBlocks,
+                    app = currentArticle.apps.singleOrNull(),
+                    hero = {
+                        when (currentArticle.apps.size) {
+                            0 -> if (currentArticle.headerImage.isNotBlank()) {
+                                ArticleHero(
+                                    imageUrl = currentArticle.headerImage,
+                                    placeholderImageUrl = currentArticle.headerImagePreview,
+                                    awardLabel = awardLabel,
+                                    title = title,
+                                    reason = summary,
+                                    showTitleLabel = currentArticle.showTitleLabel,
+                                    showCoverText = currentArticle.showCoverText,
+                                    accentColor = accentColor,
+                                    onAccentColor = { accentColor = it },
+                                    height = ArticleHeroHeight,
+                                )
+                            }
+
+                            1 -> ArticleHero(
+                                imageUrl = currentArticle.headerImage,
+                                placeholderImageUrl = currentArticle.headerImagePreview,
+                                awardLabel = awardLabel,
+                                title = title,
+                                reason = summary,
+                                showTitleLabel = currentArticle.showTitleLabel,
+                                showCoverText = currentArticle.showCoverText,
+                                accentColor = accentColor,
+                                onAccentColor = { accentColor = it },
+                                height = ArticleHeroHeight,
+                            )
+
+                            else -> GroupArticleHero(
+                                imageUrl = currentArticle.headerImage,
+                                placeholderImageUrl = currentArticle.headerImagePreview,
+                                title = title,
+                                summary = summary,
+                                apps = currentArticle.apps,
+                                accentColor = accentColor,
+                                onAccentColor = { accentColor = it },
+                            )
+                        }
+                    },
+                    innerPadding = innerPadding,
+                    bottomInset = bottomInset,
+                    lazyListState = lazyListState,
+                    scrollBehavior = scrollBehavior,
+                    onOpenApp = onOpenApp,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 沉浸式顶栏：无折叠位移的固定顶栏，容器在英雄图上保持透明，
+ * 内容滚过首屏后由 [ArticleTopBar] 自己绘制 surface 遮罩并淡入标题。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ArticleTopBar(
+    title: String,
+    onBack: () -> Unit,
+    showNavigationIcon: Boolean,
+    titleAlwaysVisible: Boolean,
+    scrollBehavior: TopAppBarScrollBehavior,
+    collapseProgress: State<Float>,
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val titleColor = MaterialTheme.colorScheme.onSurface
+    val scrimColor = MaterialTheme.colorScheme.scrim
+    TopAppBar(
+        title = {
+            Text(
+                text = title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium,
+                color = titleColor,
+                modifier = Modifier.graphicsLayer {
+                    alpha = if (titleAlwaysVisible) 1f else collapseProgress.value
+                },
+            )
+        },
+        navigationIcon = {
+            if (showNavigationIcon) {
+                // 头图上白色箭头需要底衬，保证在浅色封面里也能看清
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.background(scrimColor.copy(alpha = 0.32f), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(Res.string.back),
+                        tint = Color.White,
                     )
                 }
             }
         },
-    ) { safePadding, backdropModifier, scrollBehavior ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MiuixTheme.colorScheme.surface)
-                .then(backdropModifier),
-        ) {
-            when {
-                state.articleLoading ||
-                        (article == null && state.articleError.isBlank()) ||
-                        (article != null && !contentRevealed) ->
-                    ArticleLoadingState(safePadding = safePadding)
-
-                article == null -> ArticleErrorState(
-                    message = state.articleError,
-                    safePadding = safePadding,
-                )
-
-                else -> {
-                    val bodyBlocks = remember(article.blocks, article.apps) {
-                        orderedArticleBlocks(article).withoutBoundaryImages()
-                    }
-                    ArticleContent(
-                        bodyBlocks = bodyBlocks,
-                        safePadding = safePadding,
-                        lazyListState = lazyListState,
-                        scrollBehavior = scrollBehavior,
-                        onOpenApp = onOpenApp,
-                    )
-                }
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent,
+            titleContentColor = titleColor,
+            navigationIconContentColor = Color.White,
+            actionIconContentColor = Color.White,
+        ),
+        scrollBehavior = scrollBehavior,
+        modifier = Modifier.drawBehind {
+            val progress = if (titleAlwaysVisible) 1f else collapseProgress.value
+            if (progress > 0f) {
+                drawRect(surfaceColor.copy(alpha = progress))
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -263,19 +378,23 @@ private fun ArticleErrorState(message: String, safePadding: PaddingValues) {
     ) {
         Text(
             text = message,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            style = MiuixTheme.textStyles.main,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.align(Alignment.Center).padding(24.dp),
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ArticleContent(
     bodyBlocks: List<ArticleBlock>,
-    safePadding: PaddingValues,
+    app: MarketAppInfo?,
+    hero: @Composable () -> Unit,
+    innerPadding: PaddingValues,
+    bottomInset: Dp,
     lazyListState: LazyListState,
-    scrollBehavior: ScrollBehavior,
+    scrollBehavior: TopAppBarScrollBehavior,
     onOpenApp: (MarketAppInfo) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -284,18 +403,18 @@ private fun ArticleContent(
         state = lazyListState,
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background)
-            .scrollEndHaptic()
-            .overScrollVertical()
+            .background(MaterialTheme.colorScheme.surface)
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         contentPadding = PaddingValues(
-            start = safePadding.calculateStartPadding(layoutDirection),
-            top = safePadding.calculateTopPadding(),
-            end = safePadding.calculateEndPadding(layoutDirection),
-            bottom = safePadding.calculateBottomPadding(),
+            start = innerPadding.calculateStartPadding(layoutDirection),
+            end = innerPadding.calculateEndPadding(layoutDirection),
+            // 头图铺到状态栏下面，顶部不设内边距；底部避开导航条
+            top = 0.dp,
+            bottom = bottomInset + PageVerticalPadding,
         ),
     ) {
-        itemsIndexed(bodyBlocks, key = { index, _ -> index }) { index, block ->
+        item(key = "hero") { hero() }
+        itemsIndexed(bodyBlocks, key = { index, _ -> "block-$index" }) { index, block ->
             ArticleBlockContent(
                 block = block,
                 onOpenApp = onOpenApp,
@@ -312,106 +431,46 @@ private fun ArticleContent(
                     ),
             )
         }
-    }
-}
-
-@Composable
-private fun EditorialArticleHeader(
-    imageUrl: String,
-    placeholderImageUrl: String,
-    awardLabel: String,
-    title: String,
-    reason: String,
-    showTitleLabel: Boolean,
-    showCoverText: Boolean,
-    accentColor: Color,
-    onAccentColor: (Color) -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(447.dp)
-            .clipToBounds()
-            .background(MiuixTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        AppAsyncImage(
-            url = imageUrl,
-            contentDescription = title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    if (!showCoverText) {
-                        scaleX = 1.03f
-                        scaleY = 1.03f
-                    }
-                },
-            onDominantColor = onAccentColor,
-            placeholderMemoryCacheUrl = placeholderImageUrl.takeIf { it.isNotBlank() && it != imageUrl },
-        )
-        if (showCoverText) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to accentColor.copy(alpha = 0f),
-                            1f to accentColor,
-                        ),
-                    )
-                    .padding(top = 32.dp)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.Start,
-            ) {
-                if (showTitleLabel) {
-                    Text(
-                        text = awardLabel,
-                        color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                        style = MiuixTheme.textStyles.footnote1.copy(lineHeight = 16.sp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.graphicsLayer { blendMode = BlendMode.Plus },
-                    )
-                }
-                Text(
-                    text = reason.ifBlank { title },
-                    color = MiuixTheme.colorScheme.onPrimary,
-                    style = MiuixTheme.textStyles.title2.copy(lineHeight = 30.sp),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        app?.let { appInfo ->
+            item(key = "app") {
+                ArticleAppCard(
+                    app = appInfo,
+                    onOpenApp = onOpenApp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = if (bodyBlocks.isEmpty()) 20.dp else 0.dp),
                 )
             }
         }
     }
 }
 
+/**
+ * 全幅编辑式头图：图片铺满、底部渐变压暗，奖项标签 + 标题以白色层叠在图上。
+ */
 @Composable
-private fun SingleArticleHeader(
+private fun ArticleHero(
     imageUrl: String,
     placeholderImageUrl: String,
     awardLabel: String,
     title: String,
-    app: MarketAppInfo,
     reason: String,
     showTitleLabel: Boolean,
     showCoverText: Boolean,
     accentColor: Color,
     onAccentColor: (Color) -> Unit,
-    onOpenApp: (MarketAppInfo) -> Unit
+    modifier: Modifier = Modifier,
+    height: Dp = ArticleHeroHeight,
 ) {
-    Column(
-        modifier = Modifier
+    Box(
+        modifier = modifier
             .fillMaxWidth()
+            .height(height)
+            .clipToBounds()
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(447.dp)
-                .clipToBounds()
-                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
-        ) {
+        if (imageUrl.isNotBlank()) {
             AppAsyncImage(
                 url = imageUrl,
                 contentDescription = title,
@@ -427,56 +486,73 @@ private fun SingleArticleHeader(
                 onDominantColor = onAccentColor,
                 placeholderMemoryCacheUrl = placeholderImageUrl.takeIf { it.isNotBlank() && it != imageUrl },
             )
-            if (showCoverText) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to accentColor.copy(alpha = 0f),
-                                1f to accentColor,
-                            ),
-                        )
-                        .padding(top = 32.dp)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.Start,
-                ) {
-                    if (showTitleLabel) {
-                        Text(
-                            text = awardLabel,
-                            color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                            style = MiuixTheme.textStyles.footnote1.copy(lineHeight = 16.sp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.graphicsLayer {
-                                blendMode = BlendMode.Plus
-                            }
-                        )
-                    }
+        }
+        if (showCoverText) {
+            // 先用黑色压暗保证对比度，再叠加取色渐变保留封面色调
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.45f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.55f),
+                        ),
+                    ),
+            )
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.6f to Color.Transparent,
+                            1f to accentColor.copy(alpha = 0.85f),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                if (showTitleLabel) {
                     Text(
-                        text = reason.ifBlank { title },
-                        color = MiuixTheme.colorScheme.onPrimary,
-                        style = MiuixTheme.textStyles.title2.copy(lineHeight = 30.sp),
+                        text = awardLabel,
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium.copy(lineHeight = 34.sp),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (reason.isNotBlank()) {
+                    Text(
+                        text = reason,
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
         }
-
-        SingleArticleAppBar(
-            app = app,
-            accentColor = accentColor,
-            showInstall = true,
-            onOpenApp = onOpenApp,
-        )
     }
 }
 
+/**
+ * 多应用合辑头图：封面 + 底部渐变 + 标题 / 摘要 + 应用图标行。
+ */
 @Composable
-private fun GroupArticleHeader(
+private fun GroupArticleHero(
     imageUrl: String,
     placeholderImageUrl: String,
     title: String,
@@ -484,11 +560,12 @@ private fun GroupArticleHeader(
     apps: List<MarketAppInfo>,
     accentColor: Color,
     onAccentColor: (Color) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(509.dp)
+            .height(GroupHeroHeight)
             .background(accentColor),
     ) {
         if (imageUrl.isNotBlank()) {
@@ -501,42 +578,38 @@ private fun GroupArticleHeader(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.5f to accentColor.copy(alpha = 0.9f),
+                        1f to accentColor,
+                    ),
+                ),
+        )
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        0f to accentColor.copy(alpha = 0f),
-                        0.5f to accentColor,
-                    ),
-                )
-                .padding(top = 32.dp)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 20.dp, top = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-//                Text(
-//                    text = "电子笔记应用",
-//                    color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-//                    style = MiuixTheme.textStyles.footnote1,
-//                )
             Text(
                 text = title,
-                color = MiuixTheme.colorScheme.onPrimary,
-                style = MiuixTheme.textStyles.title3,
-                maxLines = 1,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (summary.isNotBlank()) {
                 Text(
                     text = summary,
-                    color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                    style = MiuixTheme.textStyles.body2,
-                    maxLines = 1,
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer {
-                        blendMode = BlendMode.Plus
-                    }
                 )
             }
 
@@ -548,62 +621,45 @@ private fun GroupArticleHeader(
     }
 }
 
+/**
+ * 正文末尾的应用信息卡：图标 + 名称 / 摘要 + 安装（打开详情）按钮。
+ */
 @Composable
-private fun SingleArticleAppBar(
+private fun ArticleAppCard(
     app: MarketAppInfo,
-    accentColor: Color,
-    showInstall: Boolean,
     onOpenApp: (MarketAppInfo) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(accentColor)
-            .clickable { onOpenApp(app) }
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    MarketCard(
+        modifier = modifier,
+        onClick = { onOpenApp(app) },
     ) {
         Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppIcon(
                 url = app.icon,
                 contentDescription = appDisplayName(app.displayName, app.source),
-                size = 48.dp,
+                size = 52.dp,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = appDisplayName(app.displayName, app.source),
-                    color = MiuixTheme.colorScheme.onPrimary,
-                    style = MiuixTheme.textStyles.headline1.copy(lineHeight = 22.sp),
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = app.todayAppSummary(),
-                    color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
-                    style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer {
-                        blendMode = BlendMode.Plus
-                    }
                 )
             }
-        }
-
-        if (showInstall) {
-            ArticleInstallButton(
-                onClick = { onOpenApp(app) },
-                colors = ButtonDefaults.buttonColors(
-                    color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
-                    contentColor = MiuixTheme.colorScheme.onPrimary,
-                ),
-            )
+            ArticleInstallButton(onClick = { onOpenApp(app) })
         }
     }
 }
@@ -617,15 +673,15 @@ private fun ArticleBlockContent(
     when (block) {
         is ArticleBlock.Heading -> Text(
             text = block.value,
-            color = MiuixTheme.colorScheme.onBackground,
-            style = MiuixTheme.textStyles.title2.copy(lineHeight = 30.sp),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
             modifier = modifier,
         )
 
         is ArticleBlock.Paragraph -> Text(
             text = block.value,
-            color = MiuixTheme.colorScheme.onBackground,
-            style = MiuixTheme.textStyles.paragraph.copy(lineHeight = 22.sp),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
             modifier = modifier,
         )
 
@@ -639,8 +695,7 @@ private fun ArticleBlockContent(
                 contentScale = ContentScale.Crop,
                 modifier = modifier
                     .then(if (ratio != null) Modifier.aspectRatio(ratio) else Modifier)
-                    .squircleBorder(0.2.dp, Color.Gray, 16.dp)
-                    .squircleClip(16.dp),
+                    .clip(RoundedCornerShape(20.dp)),
             )
         }
 
@@ -671,7 +726,7 @@ private fun ArticleAppRows(
 @Composable
 private fun ArticleInstallButton(
     onClick: () -> Unit,
-    colors: top.yukonga.miuix.kmp.basic.ButtonColors = ButtonDefaults.buttonColorsPrimary(),
+    colors: AppButtonColors = AppButtonDefaults.filled(),
 ) {
     AppButton(
         text = installActionText(),

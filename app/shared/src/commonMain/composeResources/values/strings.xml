@@ -76,12 +76,6 @@
     <string name="general">General</string>
     <string name="theme">Theme</string>
     <string name="theme_summary">Appearance and navigation behavior</string>
-    <string name="theme_enable_blur">Blur</string>
-    <string name="theme_enable_blur_summary">Use blurred surfaces where supported</string>
-    <string name="theme_floating_bottom_bar">Floating bottom bar</string>
-    <string name="theme_floating_bottom_bar_summary">Use a floating style for the bottom navigation bar</string>
-    <string name="theme_enable_glass">Liquid glass</string>
-    <string name="theme_enable_glass_summary">Apply a translucent glass effect to the floating bottom bar</string>
     <string name="theme_navigation_badge">Navigation badge</string>
     <string name="theme_navigation_badge_summary">Show the number of apps that can be updated</string>
     <string name="theme_predictive_back">Predictive back</string>

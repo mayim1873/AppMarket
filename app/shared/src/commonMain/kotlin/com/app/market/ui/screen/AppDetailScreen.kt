@@ -1,9 +1,16 @@
 package com.app.market.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -25,17 +32,40 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +84,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -65,22 +97,20 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
@@ -107,9 +137,9 @@ import com.app.market.resources.Res
 import com.app.market.resources.age_rating
 import com.app.market.resources.app_detail
 import com.app.market.resources.app_info
-import com.app.market.resources.app_size
 import com.app.market.resources.app_update_time
 import com.app.market.resources.app_version
+import com.app.market.resources.back
 import com.app.market.resources.cancel_download
 import com.app.market.resources.comments_and_scores
 import com.app.market.resources.date_full
@@ -145,14 +175,19 @@ import com.app.market.resources.view_offer
 import com.app.market.ui.component.AppActionButton
 import com.app.market.ui.component.AppAsyncImage
 import com.app.market.ui.component.AppButton
-import com.app.market.ui.component.AppIcon
+import com.app.market.ui.component.AppButtonDefaults
+import com.app.market.ui.component.AppTextButton
 import com.app.market.ui.component.AppVideoViewer
-import com.app.market.ui.component.CollapsibleMarketScaffold
 import com.app.market.ui.component.LoadingBox
+import com.app.market.ui.component.MarketCard
+import com.app.market.ui.component.PageHorizontalPadding
 import com.app.market.ui.component.PageVerticalPadding
 import com.app.market.ui.component.RelatedAppsCard
+import com.app.market.ui.component.SectionSpacing
+import com.app.market.ui.component.SectionTitle
 import com.app.market.ui.model.AppActionKind
 import com.app.market.ui.model.actionKind
+import com.app.market.ui.theme.MarketShapeTokens
 import com.app.market.ui.util.LocalStripAppNameSubtitle
 import com.app.market.ui.util.allowColorSampling
 import com.app.market.ui.util.animatedRect
@@ -174,33 +209,12 @@ import kotlinx.datetime.number
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.DropdownImpl
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.More
-import top.yukonga.miuix.kmp.icon.extended.Play
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
-import top.yukonga.miuix.kmp.squircle.squircleBackground
-import top.yukonga.miuix.kmp.squircle.squircleClip
-import top.yukonga.miuix.kmp.squircle.squircleSurface
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 private val PREVIEW_ITEM_HEIGHT = 200.dp
+private val PREVIEW_CORNER = 16.dp
 private val PROMOTION_PREVIEW_WIDTH = 256.dp
 private const val PORTRAIT_SCREENSHOT_RATIO = 5f / 9f
 private const val SCREENSHOT_RATIO_TIMEOUT_MS = 5_000L
@@ -214,9 +228,21 @@ private const val LANDSCAPE_SCREENSHOT_RATIO = 16f / 9f
 private const val PROMOTION_EXPANDED_RATIO = 9f / 16f
 private val PROMOTION_SHEET_MAX_WIDTH = 420.dp
 
-// miuix sheet 把手区 24dp + 空标题行 18dp
-private val PROMOTION_SHEET_CHROME_HEIGHT = 42.dp
+// 详情页头部：320dp 高的渐变 Hero，主操作与信息胶囊都收在底部
+private val HERO_HEIGHT = 320.dp
+private val HERO_ICON_SIZE = 96.dp
+private const val HERO_ACCENT_ALPHA = 0.38f
+private const val HERO_ACCENT_MID_ALPHA = 0.12f
+private val HERO_ACTION_MIN_HEIGHT = 52.dp
+private val BOTTOM_ACTION_MIN_HEIGHT = 48.dp
+private val META_CHIP_PADDING = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
 
+// 顶栏底色与标题随 Hero 滚出而淡入；底栏主操作在 Hero 的操作区滚出后才接管
+private const val TOP_BAR_ANIM_MS = 220
+private val TOP_BAR_FADE_THRESHOLD = 96.dp
+private val BOTTOM_BAR_FADE_THRESHOLD = 240.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppDetailScreen(
     viewModel: AppDetailViewModel,
@@ -242,6 +268,7 @@ fun AppDetailScreen(
     val updateText = stringResource(Res.string.update)
     val openText = stringResource(Res.string.open)
     val reserveText = stringResource(Res.string.reserve)
+    val backText = stringResource(Res.string.back)
     val current = state.detail
     val currentActionKind = state.actionKind
     val currentPackageName = current?.app?.packageName
@@ -291,6 +318,40 @@ fun AppDetailScreen(
         state.errorMessage.isNotEmpty() -> DetailPhase.Error
         else -> DetailPhase.Loading
     }
+    // 主操作与 ⋮ 菜单的回调与可见性集中一处，Hero / 顶栏 / 底栏共用
+    val actionState = if (current != null && actionKind != null) {
+        DetailActionState(
+            packageName = current.app.packageName,
+            text = actionText,
+            kind = actionKind,
+            downloadState = currentDownloadState,
+            enabled = actionKind == AppActionKind.OPEN || !current.app.isDownloadBlocked(),
+            canOpenOtherAppStore = canOpenOtherAppStore,
+            canRedownload = canRedownload,
+            canCancelDownload = canCancelDownload,
+            onAction = {
+                when (actionKind) {
+                    AppActionKind.OPEN -> viewModel.openApp(current.app)
+                    AppActionKind.INSTALL, AppActionKind.UPDATE -> viewModel.install(current.app)
+                    AppActionKind.RESERVE -> Unit
+                }
+            },
+            onResumeDownload = {
+                when (actionKind) {
+                    AppActionKind.OPEN -> viewModel.redownload(current.app)
+                    AppActionKind.INSTALL, AppActionKind.UPDATE -> viewModel.install(current.app)
+                    AppActionKind.RESERVE -> Unit
+                }
+            },
+            onOpenOtherAppStore = { openInOtherAppStore(current.app.packageName) },
+            onRedownload = { viewModel.redownload(current.app) },
+            onClearDownload = { viewModel.clearDownload(current.app.packageName) },
+            onInstallDownloaded = viewModel::installDownloaded,
+            onCancel = viewModel::cancelDownload,
+        )
+    } else {
+        null
+    }
     // 预取截图真实宽高比；只要比例，故限解码尺寸与并发
     val platformContext = LocalPlatformContext.current
     val screenshotRatios = remember(current?.app?.appId) { mutableStateMapOf<String, Float>() }
@@ -325,105 +386,147 @@ fun AppDetailScreen(
     var playingVideo by remember(appId) { mutableStateOf<AppVideo?>(null) }
     val videoCardBounds = remember { mutableStateMapOf<String, Rect>() }
 
+    // 列表滚过 Hero 后顶栏底色淡入、底栏主操作淡出——两者都由列表滚动驱动
+    val listState = rememberLazyListState()
+    val fadeThresholdPx = with(LocalDensity.current) { TOP_BAR_FADE_THRESHOLD.roundToPx() }
+    val bottomBarThresholdPx = with(LocalDensity.current) { BOTTOM_BAR_FADE_THRESHOLD.roundToPx() }
+    val scrolledPastHero by remember(listState, fadeThresholdPx) {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                    listState.firstVisibleItemScrollOffset > fadeThresholdPx
+        }
+    }
+    val scrolledPastHeroActions by remember(listState, bottomBarThresholdPx) {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                    listState.firstVisibleItemScrollOffset > bottomBarThresholdPx
+        }
+    }
+    val barOpaque = phase != DetailPhase.Content || scrolledPastHero
+    val barColor by animateColorAsState(
+        targetValue = if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent,
+        animationSpec = tween(TOP_BAR_ANIM_MS),
+        label = "detailBarColor",
+    )
+    val barTitleAlpha by animateFloatAsState(
+        targetValue = if (barOpaque) 1f else 0f,
+        animationSpec = tween(TOP_BAR_ANIM_MS),
+        label = "detailBarTitleAlpha",
+    )
+
     SelectionContainer(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize()) {
-            CollapsibleMarketScaffold(
-                title = collapsedTitle,
-                onBack = onBack,
-                actions = {
-                    if (current != null && actionKind != null) {
-                        DetailActionButton(
-                            packageName = current.app.packageName,
-                            actionText = actionText,
-                            actionKind = actionKind,
-                            downloadStateProvider = currentDownloadState,
-                            enabled = actionKind == AppActionKind.OPEN || !current.app.isDownloadBlocked(),
-                            onAction = {
-                                when (actionKind) {
-                                    AppActionKind.OPEN -> viewModel.openApp(current.app)
-                                    AppActionKind.INSTALL, AppActionKind.UPDATE -> viewModel.install(current.app)
-                                    AppActionKind.RESERVE -> Unit
-                                }
-                            },
-                            onResumeDownload = {
-                                when (actionKind) {
-                                    AppActionKind.OPEN -> viewModel.redownload(current.app)
-                                    AppActionKind.INSTALL, AppActionKind.UPDATE -> viewModel.install(current.app)
-                                    AppActionKind.RESERVE -> Unit
-                                }
-                            },
-                            onInstallDownloaded = viewModel::installDownloaded,
-                            onCancel = viewModel::cancelDownload,
-                            minHeight = 32.dp,
-                        )
-                    }
-                    if (current != null && (canOpenOtherAppStore || canRedownload || canCancelDownload)) {
-                        DetailMoreMenu(
-                            canOpenOtherAppStore = canOpenOtherAppStore,
-                            canRedownload = canRedownload,
-                            canCancelDownload = canCancelDownload,
-                            onOpenOtherAppStore = { openInOtherAppStore(current.app.packageName) },
-                            onRedownload = { viewModel.redownload(current.app) },
-                            onClearDownload = { viewModel.clearDownload(current.app.packageName) },
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                },
-                expandedContent = {
-                    if (current != null && actionKind != null) {
-                        Box(Modifier.padding(bottom = 12.dp)) {
-                            AppDetailHeading(
-                                detail = current,
-                                actionText = actionText,
-                                actionKind = actionKind,
-                                downloadStateProvider = currentDownloadState,
-                                canOpenOtherAppStore = canOpenOtherAppStore,
-                                canRedownload = canRedownload,
-                                canCancelDownload = canCancelDownload,
-                                onOpenOtherAppStore = { openInOtherAppStore(current.app.packageName) },
-                                onRedownload = { viewModel.redownload(current.app) },
-                                onClearDownload = { viewModel.clearDownload(current.app.packageName) },
-                                onAction = {
-                                    when (actionKind) {
-                                        AppActionKind.OPEN -> viewModel.openApp(current.app)
-                                        AppActionKind.INSTALL, AppActionKind.UPDATE -> viewModel.install(
-                                            current.app
-                                        )
-
-                                        AppActionKind.RESERVE -> Unit
-                                    }
-                                },
-                                onResumeDownload = {
-                                    when (actionKind) {
-                                        AppActionKind.OPEN -> viewModel.redownload(current.app)
-                                        AppActionKind.INSTALL, AppActionKind.UPDATE -> viewModel.install(
-                                            current.app
-                                        )
-
-                                        AppActionKind.RESERVE -> Unit
-                                    }
-                                },
-                                onInstallDownloaded = viewModel::installDownloaded,
-                                onCancel = viewModel::cancelDownload,
-                                onSaveImage = saveImage,
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = MaterialTheme.colorScheme.surface,
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = collapsedTitle,
+                                modifier = Modifier.alpha(barTitleAlpha),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleMedium,
                             )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = backText,
+                                )
+                            }
+                        },
+                        actions = {
+                            val menuActions = actionState
+                            if (menuActions != null && menuActions.hasMenu) {
+                                DetailMoreMenu(
+                                    canOpenOtherAppStore = menuActions.canOpenOtherAppStore,
+                                    canRedownload = menuActions.canRedownload,
+                                    canCancelDownload = menuActions.canCancelDownload,
+                                    onOpenOtherAppStore = menuActions.onOpenOtherAppStore,
+                                    onRedownload = menuActions.onRedownload,
+                                    onClearDownload = menuActions.onClearDownload,
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = barColor,
+                            scrolledContainerColor = barColor,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                },
+                bottomBar = {
+                    // Hero 滚出视口后接管主操作，长页面里不必回滚到顶部
+                    AnimatedVisibility(
+                        visible = phase == DetailPhase.Content &&
+                                scrolledPastHeroActions &&
+                                actionState != null,
+                        enter = fadeIn(tween(TOP_BAR_ANIM_MS)) +
+                                slideInVertically(tween(TOP_BAR_ANIM_MS)) { it / 2 },
+                        exit = fadeOut(tween(TOP_BAR_ANIM_MS)) +
+                                slideOutVertically(tween(TOP_BAR_ANIM_MS)) { it / 2 },
+                    ) {
+                        val barActions = actionState
+                        if (barActions != null) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .padding(
+                                            start = PageHorizontalPadding,
+                                            end = PageHorizontalPadding,
+                                            top = 10.dp,
+                                            bottom = 10.dp,
+                                        ),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    DetailActionButton(
+                                        packageName = barActions.packageName,
+                                        actionText = barActions.text,
+                                        actionKind = barActions.kind,
+                                        downloadStateProvider = barActions.downloadState,
+                                        enabled = barActions.enabled,
+                                        onAction = barActions.onAction,
+                                        onResumeDownload = barActions.onResumeDownload,
+                                        onInstallDownloaded = barActions.onInstallDownloaded,
+                                        onCancel = barActions.onCancel,
+                                        minHeight = BOTTOM_ACTION_MIN_HEIGHT,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (barActions.hasMenu) {
+                                        DetailMoreMenu(
+                                            canOpenOtherAppStore = barActions.canOpenOtherAppStore,
+                                            canRedownload = barActions.canRedownload,
+                                            canCancelDownload = barActions.canCancelDownload,
+                                            onOpenOtherAppStore = barActions.onOpenOtherAppStore,
+                                            onRedownload = barActions.onRedownload,
+                                            onClearDownload = barActions.onClearDownload,
+                                            tonal = true,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 },
-            ) { innerPadding, backdropModifier, scrollBehavior ->
+            ) { innerPadding ->
                 val layoutDirection = LocalLayoutDirection.current
+                // 顶部不加内边距：Hero 要一直画到状态栏下面，顶栏底色再随滚动淡入
                 val contentPadding = PaddingValues(
                     start = innerPadding.calculateStartPadding(layoutDirection),
                     end = innerPadding.calculateEndPadding(layoutDirection),
-                    top = innerPadding.calculateTopPadding() + PageVerticalPadding,
                     bottom = innerPadding.calculateBottomPadding() + PageVerticalPadding,
                 )
                 Crossfade(
                     targetState = phase,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MiuixTheme.colorScheme.surface)
-                        .then(backdropModifier),
+                    modifier = Modifier.fillMaxSize(),
                     label = "detail",
                 ) { target ->
                     when (target) {
@@ -436,8 +539,8 @@ fun AppDetailScreen(
                         ) {
                             Text(
                                 text = state.errorMessage,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                style = MiuixTheme.textStyles.main,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyLarge,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -445,12 +548,13 @@ fun AppDetailScreen(
                         DetailPhase.Content -> current?.let { detail ->
                             AppDetailContent(
                                 current = detail,
+                                actions = actionState,
                                 downloadStates = downloadStates,
                                 showComments = showComments,
                                 showSameDeveloper = showSameDeveloper,
                                 showPromotions = showPromotions,
                                 contentPadding = contentPadding,
-                                scrollBehavior = scrollBehavior,
+                                listState = listState,
                                 viewModel = viewModel,
                                 uiPlatform = uiPlatform,
                                 saveImage = saveImage,
@@ -497,15 +601,38 @@ fun AppDetailScreen(
 
 private enum class DetailPhase { Loading, Error, Content }
 
+/** 详情页主操作状态：Hero、顶栏 ⋮ 菜单与底部操作栏共用同一份回调。 */
+private class DetailActionState(
+    val packageName: String,
+    val text: String,
+    val kind: AppActionKind,
+    val downloadState: State<DownloadState?>,
+    val enabled: Boolean,
+    val canOpenOtherAppStore: Boolean,
+    val canRedownload: Boolean,
+    val canCancelDownload: Boolean,
+    val onAction: () -> Unit,
+    val onResumeDownload: () -> Unit,
+    val onOpenOtherAppStore: () -> Unit,
+    val onRedownload: () -> Unit,
+    val onClearDownload: () -> Unit,
+    val onInstallDownloaded: (String) -> Unit,
+    val onCancel: (String) -> Unit,
+) {
+    val hasMenu: Boolean get() = canOpenOtherAppStore || canRedownload || canCancelDownload
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppDetailContent(
     current: AppDetail,
+    actions: DetailActionState?,
     downloadStates: State<Map<String, DownloadState>>,
     showComments: Boolean,
     showSameDeveloper: Boolean,
     showPromotions: Boolean,
     contentPadding: PaddingValues,
-    scrollBehavior: ScrollBehavior,
+    listState: LazyListState,
     viewModel: AppDetailViewModel,
     uiPlatform: UiPlatform,
     saveImage: (String, String) -> Unit,
@@ -542,7 +669,6 @@ private fun AppDetailContent(
     val packageNameLabel = stringResource(Res.string.package_name)
     val tapToOpenText = stringResource(Res.string.tap_to_open)
     val viewMoreText = stringResource(Res.string.view_more)
-    val appSizeLabel = stringResource(Res.string.app_size)
     val versionLabel = stringResource(Res.string.app_version)
     val updateTimeLabel = stringResource(Res.string.app_update_time)
     val introduction = current.introduction.ifBlank { current.brief }
@@ -554,14 +680,22 @@ private fun AppDetailContent(
     val sheetPromotion = current.promotions.getOrNull(promotionSheetIndex)
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .scrollEndHaptic()
-            .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(SectionSpacing),
     ) {
+        // Hero 是列表第一项：随内容一起滚出，顶栏底色再淡入
+        item(key = "hero") {
+            actions?.let { heroActions ->
+                DetailHero(
+                    detail = current,
+                    actions = heroActions,
+                    onSaveImage = saveImage,
+                )
+            }
+        }
+
         item(key = "stats") {
             AppDetailStatsRow(
                 rating = formatRating(current.app.ratingScore),
@@ -570,8 +704,6 @@ private fun AppDetailContent(
                     .takeUnless { current.app.source == AppSource.SAMSUNG }
                     ?.let { formatCount(it).ifBlank { "0" } },
                 downloadsLabel = downloadCountLabel,
-                appSize = formatSize(current.app.apkSize).ifBlank { "--" },
-                appSizeLabel = appSizeLabel,
                 ageClassification = current.ageClassification,
                 ageLabel = ageLabel,
                 onReviewsClick = if (current.comments.isNotEmpty()) {
@@ -611,12 +743,10 @@ private fun AppDetailContent(
             DetailSection(
                 title = appInfoTitle,
             ) {
-                Card(
+                MarketCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    cornerRadius = 16.dp,
-                    insideMargin = PaddingValues(16.dp),
+                        .padding(horizontal = PageHorizontalPadding),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         InfoLine(packageNameLabel, current.app.packageName)
@@ -640,7 +770,7 @@ private fun AppDetailContent(
                             InfoLine(
                                 label = privacyLabel,
                                 value = tapToOpenText,
-                                valueColor = MiuixTheme.colorScheme.primary,
+                                valueColor = MaterialTheme.colorScheme.primary,
                                 onValueClick = { uriHandler.openUri(current.privacyUrl) },
                             )
                         }
@@ -648,7 +778,7 @@ private fun AppDetailContent(
                             InfoLine(
                                 label = historicalVersionsLabel,
                                 value = historicalVersionsSummary,
-                                valueColor = MiuixTheme.colorScheme.primary,
+                                valueColor = MaterialTheme.colorScheme.primary,
                                 onValueClick = { onOpenHistory(current.app) },
                             )
                         }
@@ -663,37 +793,28 @@ private fun AppDetailContent(
                 DetailSection(
                     title = commentsTitle,
                 ) {
-                    Card(
+                    MarketCard(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        cornerRadius = 16.dp,
-                        insideMargin = PaddingValues(16.dp),
+                            .padding(horizontal = PageHorizontalPadding),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column {
-                                Text(
-                                    text = formatRating(current.app.ratingScore),
-                                    color = MiuixTheme.colorScheme.onSurface,
-                                    style = MiuixTheme.textStyles.title1.copy(lineHeight = 40.sp),
-                                )
-                                Text(
-                                    text = commentsLabel,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
-                                )
-                            }
+                            RatingSummary(
+                                score = formatRating(current.app.ratingScore),
+                                commentsLabel = commentsLabel,
+                            )
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 displayedComments.forEach { comment ->
                                     CommentContent(comment)
                                 }
                             }
                             if (current.comments.size > 2) {
-                                Text(
+                                AppTextButton(
                                     text = viewMoreText,
-                                    color = MiuixTheme.colorScheme.primary,
-                                    style = MiuixTheme.textStyles.main.copy(lineHeight = 22.sp),
-                                    modifier = Modifier.clickable { showCommentsSheet = true },
+                                    onClick = { showCommentsSheet = true },
+                                    minWidth = 0.dp,
+                                    minHeight = 0.dp,
+                                    insideMargin = PaddingValues(0.dp),
                                 )
                             }
                         }
@@ -713,7 +834,7 @@ private fun AppDetailContent(
                 DetailSection(
                     title = sameDeveloperTitle,
                 ) {
-                    Box(Modifier.padding(horizontal = 12.dp)) {
+                    Box(Modifier.padding(horizontal = PageHorizontalPadding)) {
                         RelatedAppsCard(
                             apps = sameDeveloper,
                             onOpenApp = onOpenDetail,
@@ -722,7 +843,6 @@ private fun AppDetailContent(
                                 (if (stripNameSubtitle) "" else app.displayName.splitAppDisplayName(app.source).description)
                                     .ifBlank { app.publisherName }
                             },
-                            colors = CardDefaults.defaultColors(),
                         ) { app ->
                             val reservation = app.isReservation()
                             val rowDownloadState = remember(app.packageName) {
@@ -746,64 +866,231 @@ private fun AppDetailContent(
         }
     }
 
-    OverlayBottomSheet(
-        show = showCommentsSheet,
-        title = commentsTitle,
-        onDismissRequest = { showCommentsSheet = false },
-        enableNestedScroll = true,
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    if (showCommentsSheet) {
+        val commentsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showCommentsSheet = false },
+            sheetState = commentsSheetState,
         ) {
-            item(key = "comments-summary") {
-                Column {
-                    Text(
-                        text = formatRating(current.app.ratingScore),
-                        color = MiuixTheme.colorScheme.onSurface,
-                        style = MiuixTheme.textStyles.title1.copy(lineHeight = 40.sp),
-                    )
-                    Text(
-                        text = commentsLabel,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
+            Text(
+                text = commentsTitle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PageHorizontalPadding)
+                    .padding(bottom = 12.dp),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(
+                    start = PageHorizontalPadding,
+                    end = PageHorizontalPadding,
+                    bottom = 12.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item(key = "comments-summary") {
+                    RatingSummary(
+                        score = formatRating(current.app.ratingScore),
+                        commentsLabel = commentsLabel,
                     )
                 }
-            }
-            itemsIndexed(
-                items = current.comments,
-                key = { index, comment -> "${index}_${comment.userName}" },
-            ) { _, comment ->
-                CommentContent(comment)
+                itemsIndexed(
+                    items = current.comments,
+                    key = { index, comment -> "${index}_${comment.userName}" },
+                ) { _, comment ->
+                    CommentContent(comment)
+                }
             }
         }
     }
 
-    var promotionHandleColor by remember(sheetPromotion?.expandedImageUrl) { mutableStateOf(Color.White) }
-    OverlayBottomSheet(
-        show = showPromotionSheet && sheetPromotion != null,
-        dragHandleColor = promotionHandleColor,
-        sheetMaxWidth = PROMOTION_SHEET_MAX_WIDTH,
-        insideMargin = DpSize(0.dp, 0.dp),
-        onDismissRequest = { showPromotionSheet = false },
-        allowDismiss = true,
-        enableNestedScroll = true,
+    if (showPromotionSheet && sheetPromotion != null) {
+        val promotionSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showPromotionSheet = false },
+            sheetState = promotionSheetState,
+            sheetMaxWidth = PROMOTION_SHEET_MAX_WIDTH,
+            // 图片本身就是面板背景，默认把手会露出面板底色
+            dragHandle = null,
+            containerColor = Color.Black,
+            contentColor = Color.White,
+        ) {
+            val openLinkFailedText = stringResource(Res.string.open_link_failed)
+            sheetPromotion?.let { promotion ->
+                PromotionDetails(
+                    promotion = promotion,
+                    onOpenOffer = promotion.jumpUrl.takeIf(String::isNotBlank)?.let { jumpUrl ->
+                        {
+                            runCatching { uriHandler.openUri(jumpUrl) }
+                                .onFailure { uiPlatform.showToast(openLinkFailedText) }
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** 头部 Hero：图标主色渐变 + 图标 / 名称 / 副标题 + 信息胶囊 + 主操作。 */
+@Composable
+private fun DetailHero(
+    detail: AppDetail,
+    actions: DetailActionState,
+    onSaveImage: (String, String) -> Unit,
+) {
+    val surface = MaterialTheme.colorScheme.surface
+    val fallbackAccent = MaterialTheme.colorScheme.primary
+    var accentColor by remember(detail.app.appId) { mutableStateOf(fallbackAccent) }
+    val chips = buildList {
+        detail.app.versionName.takeIf { it.isNotBlank() }?.let { add(HeroChip(it)) }
+        formatSize(detail.app.apkSize).takeIf { it.isNotBlank() }?.let { add(HeroChip(it)) }
+        if (detail.category.isNotBlank()) {
+            add(HeroChip(detail.category))
+        } else if (detail.app.ratingScore > 0.0) {
+            add(HeroChip(formatRating(detail.app.ratingScore), showStar = true))
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HERO_HEIGHT)
+            .background(
+                Brush.verticalGradient(
+                    0f to accentColor.copy(alpha = HERO_ACCENT_ALPHA),
+                    0.55f to accentColor.copy(alpha = HERO_ACCENT_MID_ALPHA),
+                    1f to surface,
+                ),
+            ),
+        contentAlignment = Alignment.BottomStart,
     ) {
-        val openLinkFailedText = stringResource(Res.string.open_link_failed)
-        sheetPromotion?.let { promotion ->
-            PromotionDetails(
-                promotion = promotion,
-                onOpenOffer = promotion.jumpUrl.takeIf(String::isNotBlank)?.let { jumpUrl ->
-                    {
-                        runCatching { uriHandler.openUri(jumpUrl) }
-                            .onFailure { uiPlatform.showToast(openLinkFailedText) }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PageHorizontalPadding)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SaveableImageBox(
+                    url = detail.app.icon,
+                    fileName = "${detail.app.packageName}_icon",
+                    onSaveImage = onSaveImage,
+                ) {
+                    AppAsyncImage(
+                        url = detail.app.icon,
+                        contentDescription = appDisplayName(detail.app.displayName, detail.app.source),
+                        modifier = Modifier
+                            .size(HERO_ICON_SIZE)
+                            .clip(RoundedCornerShape(MarketShapeTokens.CardCorner))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        onDominantColor = { accentColor = it },
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = appDisplayName(detail.app.displayName, detail.app.source),
+                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = detail.app.publisherName.ifBlank { detail.app.packageName },
+                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                    )
+                }
+            }
+            if (chips.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    chips.forEach { chip ->
+                        MetaChip(text = chip.text, showStar = chip.showStar)
                     }
-                },
-                onHandleColor = { promotionHandleColor = it },
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DetailActionButton(
+                    packageName = actions.packageName,
+                    actionText = actions.text,
+                    actionKind = actions.kind,
+                    downloadStateProvider = actions.downloadState,
+                    enabled = actions.enabled,
+                    onAction = actions.onAction,
+                    onResumeDownload = actions.onResumeDownload,
+                    onInstallDownloaded = actions.onInstallDownloaded,
+                    onCancel = actions.onCancel,
+                    minHeight = HERO_ACTION_MIN_HEIGHT,
+                    insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(1f),
+                )
+                if (actions.hasMenu) {
+                    DetailMoreMenu(
+                        canOpenOtherAppStore = actions.canOpenOtherAppStore,
+                        canRedownload = actions.canRedownload,
+                        canCancelDownload = actions.canCancelDownload,
+                        onOpenOtherAppStore = actions.onOpenOtherAppStore,
+                        onRedownload = actions.onRedownload,
+                        onClearDownload = actions.onClearDownload,
+                        tonal = true,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class HeroChip(
+    val text: String,
+    val showStar: Boolean = false,
+)
+
+/** Hero 里的信息胶囊（版本 / 大小 / 分类 / 评分）。 */
+@Composable
+private fun MetaChip(
+    text: String,
+    showStar: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(MarketShapeTokens.TagCorner))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(META_CHIP_PADDING),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (showStar) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_star_fill),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(12.dp),
             )
         }
+        Text(
+            text = text,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
     }
 }
 
@@ -813,59 +1100,55 @@ private fun AppDetailStatsRow(
     reviews: String,
     downloads: String?,
     downloadsLabel: String,
-    appSize: String,
-    appSizeLabel: String,
     /** 空串表示没有分级信息，整格连同分隔线一起省掉。 */
     ageClassification: String,
     ageLabel: String,
     /** 无评论正文时传 null，否则点开只是空面板。 */
     onReviewsClick: (() -> Unit)?,
 ) {
-    Row(
+    MarketCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = PageHorizontalPadding),
     ) {
-        DetailStat(
-            value = rating,
-            label = reviews,
-            showStar = true,
-            modifier = Modifier
-                .weight(1f)
-                .then(
-                    if (onReviewsClick != null) {
-                        Modifier.clickable(
-                            interactionSource = null,
-                            indication = null,
-                            onClick = onReviewsClick,
-                        )
-                    } else {
-                        Modifier
-                    }
-                ),
-        )
-        if (downloads != null) {
-            DetailStatDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             DetailStat(
-                value = downloads,
-                label = downloadsLabel,
-                modifier = Modifier.weight(1f),
+                value = rating,
+                label = reviews,
+                showStar = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (onReviewsClick != null) {
+                            Modifier.clickable(
+                                interactionSource = null,
+                                indication = null,
+                                onClick = onReviewsClick,
+                            )
+                        } else {
+                            Modifier
+                        }
+                    ),
             )
-        }
-        DetailStatDivider()
-        DetailStat(
-            value = appSize,
-            label = appSizeLabel,
-            modifier = Modifier.weight(1f),
-        )
-        if (ageClassification.isNotBlank()) {
-            DetailStatDivider()
-            DetailStat(
-                value = ageClassification,
-                label = ageLabel,
-                modifier = Modifier.weight(1f),
-            )
+            if (downloads != null) {
+                DetailStatDivider()
+                DetailStat(
+                    value = downloads,
+                    label = downloadsLabel,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (ageClassification.isNotBlank()) {
+                DetailStatDivider()
+                DetailStat(
+                    value = ageClassification,
+                    label = ageLabel,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -888,8 +1171,8 @@ private fun DetailStat(
         ) {
             Text(
                 text = value,
-                color = MiuixTheme.colorScheme.onSurface,
-                style = MiuixTheme.textStyles.main.copy(lineHeight = 20.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -897,15 +1180,15 @@ private fun DetailStat(
                 Icon(
                     painter = painterResource(Res.drawable.ic_star_fill),
                     contentDescription = null,
-                    tint = MiuixTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(16.dp)
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
         Text(
             text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, lineHeight = 16.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -918,7 +1201,7 @@ private fun DetailStatDivider() {
         modifier = Modifier
             .width(1.dp)
             .height(28.dp)
-            .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
+            .background(MaterialTheme.colorScheme.outlineVariant),
     )
 }
 
@@ -941,17 +1224,15 @@ private fun PreviewAndIntroductionSection(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(SectionSpacing),
     ) {
         if (showPromotions) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallTitle(
-                    text = promotionsTitle,
-                    insideMargin = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                // 标题自带 8dp 底边距，子区块之间只靠外层 20dp 间距
+                SectionTitle(text = promotionsTitle, topPadding = 0.dp)
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    contentPadding = PaddingValues(horizontal = PageHorizontalPadding),
                 ) {
                     itemsIndexed(
                         current.promotions,
@@ -969,18 +1250,15 @@ private fun PreviewAndIntroductionSection(
         }
 
         if (current.videos.isNotEmpty() || current.screenshots.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallTitle(
-                    text = screenshotsTitle,
-                    insideMargin = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                SectionTitle(text = screenshotsTitle, topPadding = 0.dp)
                 val readyPrefix = current.screenshots
                     .indexOfFirst { !screenshotRatios.containsKey(it.url) }
                     .let { if (it < 0) current.screenshots.size else it }
                 LazyRow(
                     modifier = Modifier.height(PREVIEW_ITEM_HEIGHT),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    contentPadding = PaddingValues(horizontal = PageHorizontalPadding),
                 ) {
                     itemsIndexed(
                         current.videos,
@@ -1015,7 +1293,7 @@ private fun PreviewAndIntroductionSection(
                                         onScreenshotCardPositioned(shot.url, Rect(it.positionInRoot(), it.size.toSize()))
                                     }
                                     .graphicsLayer { alpha = if (index == hiddenScreenshot) 0f else 1f }
-                                    .squircleClip(16.dp),
+                                    .clip(RoundedCornerShape(PREVIEW_CORNER)),
                             )
                         }
                     }
@@ -1024,11 +1302,8 @@ private fun PreviewAndIntroductionSection(
         }
 
         if (introduction.isNotBlank()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallTitle(
-                    text = stringResource(Res.string.introduction),
-                    insideMargin = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                SectionTitle(text = stringResource(Res.string.introduction), topPadding = 0.dp)
                 IntroductionSummary(
                     text = introduction,
                 )
@@ -1056,10 +1331,8 @@ private fun VideoPreviewCard(
                 onPositioned(Rect(it.positionInRoot(), it.size.toSize()))
             }
             .graphicsLayer { alpha = if (hidden) 0f else 1f }
-            .squircleSurface(
-                color = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 16.dp,
-            )
+            .clip(RoundedCornerShape(PREVIEW_CORNER))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -1072,17 +1345,16 @@ private fun VideoPreviewCard(
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .squircleBackground(
-                    color = Color.Black.copy(alpha = 0.35f),
-                    cornerRadius = 22.dp,
-                ),
+                .background(Color.Black.copy(alpha = 0.35f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                modifier = Modifier.padding(start = 2.dp),
-                imageVector = MiuixIcons.Play,
+                imageVector = Icons.Filled.PlayArrow,
                 contentDescription = stringResource(Res.string.video_play),
                 tint = Color.White,
+                modifier = Modifier
+                    .padding(start = 2.dp)
+                    .size(24.dp),
             )
         }
     }
@@ -1096,7 +1368,9 @@ private fun PromotionPreview(
     onSaveImage: (String, String) -> Unit,
 ) {
     Column(
-        modifier = Modifier.width(PROMOTION_PREVIEW_WIDTH),
+        modifier = Modifier
+            .width(PROMOTION_PREVIEW_WIDTH)
+            .padding(vertical = 4.dp),
     ) {
         SaveableImageBox(
             url = promotion.previewImageUrl,
@@ -1112,15 +1386,15 @@ private fun PromotionPreview(
                     .padding(bottom = 4.dp)
                     .width(PROMOTION_PREVIEW_WIDTH)
                     .height(PROMOTION_PREVIEW_WIDTH / LANDSCAPE_SCREENSHOT_RATIO)
-                    .squircleClip(16.dp),
+                    .clip(RoundedCornerShape(PREVIEW_CORNER)),
             )
         }
         if (promotion.title.isNotBlank()) {
             Text(
                 text = promotion.title,
                 modifier = Modifier.padding(horizontal = 4.dp),
-                color = MiuixTheme.colorScheme.onSurface,
-                style = MiuixTheme.textStyles.main,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1129,8 +1403,8 @@ private fun PromotionPreview(
             Text(
                 text = promotion.category,
                 modifier = Modifier.padding(horizontal = 4.dp),
-                color = MiuixTheme.colorScheme.primary,
-                style = MiuixTheme.textStyles.body2,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1142,13 +1416,14 @@ private fun PromotionPreview(
 private fun PromotionDetails(
     promotion: AppPromotion,
     onOpenOffer: (() -> Unit)?,
-    onHandleColor: (Color) -> Unit,
 ) {
     var imageRatio by remember(promotion.expandedImageUrl) {
         mutableFloatStateOf(
             PROMOTION_EXPANDED_RATIO
         )
     }
+    // 把手压在图片上，颜色按图片顶部亮度取反，浅色图用深色把手
+    var handleColor by remember(promotion.expandedImageUrl) { mutableStateOf(Color.White) }
     val sheetScrollState = rememberScrollState()
     val platformContext = LocalPlatformContext.current
     val background = rememberAsyncImagePainter(
@@ -1170,7 +1445,7 @@ private fun PromotionDetails(
                 // 亮度采样要做整图位图拷贝
                 val luminance = withContext(Dispatchers.Default) { topRegionLuminance(image) }
                 if (luminance != null) {
-                    onHandleColor(if (luminance > 0.5f) Color.Black else Color.White)
+                    handleColor = if (luminance > 0.5f) Color.Black else Color.White
                 }
             }
         }
@@ -1178,8 +1453,7 @@ private fun PromotionDetails(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // 背景画在内容内以随 sheet 位移；zIndex 压到把手之下，drawBehind 向上延伸盖住把手区
-            .zIndex(-1f)
+            // 背景画在内容内以随 sheet 位移
             .drawBehind { drawPromotionBackground(background) }
             .animateContentSize(),
     ) {
@@ -1214,7 +1488,7 @@ private fun PromotionDetails(
                     Text(
                         text = promotion.title,
                         color = Color.White,
-                        style = MiuixTheme.textStyles.title3,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -1224,7 +1498,7 @@ private fun PromotionDetails(
                     Text(
                         text = labels.joinToString(" | "),
                         color = Color.White.copy(alpha = 0.8f),
-                        style = MiuixTheme.textStyles.body2,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 if (promotion.description.isNotBlank()) {
@@ -1236,7 +1510,7 @@ private fun PromotionDetails(
                         Text(
                             text = promotion.description,
                             color = Color.White.copy(alpha = 0.9f),
-                            style = MiuixTheme.textStyles.paragraph.copy(lineHeight = 22.sp),
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
                         )
                     }
                 }
@@ -1245,33 +1519,38 @@ private fun PromotionDetails(
                         text = stringResource(Res.string.view_offer),
                         onClick = onOpenOffer,
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 12.dp),
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        cornerRadius = 100.dp,
+                        colors = AppButtonDefaults.filled(),
+                        cornerRadius = MarketShapeTokens.ButtonCorner,
                     )
                 }
             }
         }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp)
+                .width(32.dp)
+                .height(4.dp)
+                .background(handleColor.copy(alpha = 0.75f), RoundedCornerShape(2.dp)),
+        )
     }
 }
 
-// 等比铺满内容区与上方把手区（Crop）；painter 未加载时无固有尺寸（NaN 比较为 false），走 else 分支不可见
+// 等比铺满内容区（Crop）；painter 未加载时无固有尺寸（NaN 比较为 false），走 else 分支不可见
 private fun DrawScope.drawPromotionBackground(painter: Painter) {
-    val chromePx = PROMOTION_SHEET_CHROME_HEIGHT.toPx()
-    val target = Size(size.width, size.height + chromePx)
+    val target = Size(size.width, size.height)
     val intrinsic = painter.intrinsicSize
-    translate(top = -chromePx) {
-        if (intrinsic.width > 0f && intrinsic.height > 0f) {
-            val scale = maxOf(target.width / intrinsic.width, target.height / intrinsic.height)
-            val drawSize = Size(intrinsic.width * scale, intrinsic.height * scale)
-            translate(
-                left = (target.width - drawSize.width) / 2f,
-                top = (target.height - drawSize.height) / 2f,
-            ) {
-                with(painter) { draw(drawSize) }
-            }
-        } else {
-            with(painter) { draw(target) }
+    if (intrinsic.width > 0f && intrinsic.height > 0f) {
+        val scale = maxOf(target.width / intrinsic.width, target.height / intrinsic.height)
+        val drawSize = Size(intrinsic.width * scale, intrinsic.height * scale)
+        translate(
+            left = (target.width - drawSize.width) / 2f,
+            top = (target.height - drawSize.height) / 2f,
+        ) {
+            with(painter) { draw(drawSize) }
         }
+    } else {
+        with(painter) { draw(target) }
     }
 }
 
@@ -1282,19 +1561,19 @@ private fun IntroductionSummary(
     var expanded by remember(text) { mutableStateOf(false) }
     var hasVisualOverflow by remember(text) { mutableStateOf(false) }
     val showMore = !expanded && hasVisualOverflow
-    val descriptionStyle = MiuixTheme.textStyles.paragraph.copy(lineHeight = 22.sp)
+    val descriptionStyle = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerLow
     Box(
         modifier = Modifier
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = PageHorizontalPadding)
             .fillMaxWidth(),
     ) {
-        Card(Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
-            val surface = MiuixTheme.colorScheme.surfaceContainer
+        MarketCard(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth()) {
                 Text(
                     text = text,
                     modifier = Modifier.fillMaxWidth(),
-                    color = MiuixTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = descriptionStyle,
                     maxLines = if (expanded) Int.MAX_VALUE else 3,
                     overflow = TextOverflow.Clip,
@@ -1317,14 +1596,14 @@ private fun IntroductionSummary(
                                 .background(
                                     Brush.horizontalGradient(
                                         0f to Color.Transparent,
-                                        1f to surface,
+                                        1f to cardColor,
                                     ),
                                 ),
                         )
                         Text(
                             text = stringResource(Res.string.view_more),
-                            modifier = Modifier.background(surface),
-                            color = MiuixTheme.colorScheme.primary,
+                            modifier = Modifier.background(cardColor),
+                            color = MaterialTheme.colorScheme.primary,
                             style = descriptionStyle,
                             maxLines = 1,
                         )
@@ -1342,110 +1621,15 @@ private fun DetailSection(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        // Zero vertical inside margin: the list's 20.dp item spacing and this column's 8.dp gap
-        // own the vertical rhythm, matching the app-wide SectionTitle look.
-        SmallTitle(
-            text = title,
-            insideMargin = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
-        )
+        // 标题自带 20dp 上边距（列表间距已提供，这里用 0）与 8dp 下边距
+        SectionTitle(text = title, topPadding = 0.dp)
         content()
     }
 }
 
-@Composable
-private fun AppDetailHeading(
-    detail: AppDetail,
-    actionText: String,
-    actionKind: AppActionKind,
-    downloadStateProvider: State<DownloadState?>,
-    canOpenOtherAppStore: Boolean,
-    canRedownload: Boolean,
-    canCancelDownload: Boolean,
-    onOpenOtherAppStore: () -> Unit,
-    onAction: () -> Unit,
-    onResumeDownload: () -> Unit,
-    onInstallDownloaded: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onRedownload: () -> Unit,
-    onClearDownload: () -> Unit,
-    onSaveImage: (String, String) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .padding(top = 12.dp)
-            .padding(horizontal = 12.dp)
-            .height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SaveableImageBox(
-            url = detail.app.icon,
-            fileName = "${detail.app.packageName}_icon",
-            onSaveImage = onSaveImage,
-        ) {
-            AppIcon(
-                url = detail.app.icon,
-                contentDescription = appDisplayName(detail.app.displayName, detail.app.source),
-                size = 96.dp,
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .fillMaxHeight(),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.Start,
-        ) {
-            Column {
-                Text(
-                    text = appDisplayName(detail.app.displayName, detail.app.source),
-                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
-                    color = MiuixTheme.colorScheme.onSurface,
-                    style = MiuixTheme.textStyles.title2.copy(lineHeight = 30.sp),
-                    maxLines = 1,
-                )
-                Text(
-                    text = detail.app.publisherName.ifBlank { detail.app.packageName },
-                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
-                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                    style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
-                    maxLines = 1,
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DetailActionButton(
-                    packageName = detail.app.packageName,
-                    actionText = actionText,
-                    actionKind = actionKind,
-                    downloadStateProvider = downloadStateProvider,
-                    enabled = actionKind == AppActionKind.OPEN || !detail.app.isDownloadBlocked(),
-                    onAction = onAction,
-                    onResumeDownload = onResumeDownload,
-                    onInstallDownloaded = onInstallDownloaded,
-                    onCancel = onCancel,
-                    minHeight = 32.dp,
-                )
-                if (canOpenOtherAppStore || canRedownload || canCancelDownload) {
-                    DetailMoreMenu(
-                        canOpenOtherAppStore = canOpenOtherAppStore,
-                        canRedownload = canRedownload,
-                        canCancelDownload = canCancelDownload,
-                        onOpenOtherAppStore = onOpenOtherAppStore,
-                        onRedownload = onRedownload,
-                        onClearDownload = onClearDownload,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 顶栏与展开头部共用的 ⋮ 菜单按钮，弹窗锚定在按钮处。 */
+/** 顶栏 / Hero / 底栏共用的 ⋮ 菜单按钮，弹窗锚定在按钮处。 */
 @Composable
 private fun DetailMoreMenu(
     canOpenOtherAppStore: Boolean,
@@ -1455,71 +1639,64 @@ private fun DetailMoreMenu(
     onRedownload: () -> Unit,
     onClearDownload: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Hero 与底栏用填充色调按钮，顶栏用普通图标按钮。 */
+    tonal: Boolean = false,
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val moreText = stringResource(Res.string.more_options)
     Box(modifier) {
-        IconButton(
-            onClick = { showMenu = true },
-            holdDownState = showMenu,
-            backgroundColor = MiuixTheme.colorScheme.secondaryVariant,
-            cornerRadius = 100.dp,
-            minHeight = 32.dp,
-            minWidth = 32.dp,
-        ) {
-            Icon(
-                imageVector = MiuixIcons.More,
-                contentDescription = stringResource(Res.string.more_options),
-                tint = MiuixTheme.colorScheme.onSecondaryVariant,
-                modifier = Modifier.size(20.dp),
-            )
+        val toggle: () -> Unit = { showMenu = true }
+        if (tonal) {
+            FilledTonalIconButton(
+                onClick = toggle,
+                modifier = Modifier.size(HERO_ACTION_MIN_HEIGHT),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = moreText,
+                )
+            }
+        } else {
+            IconButton(onClick = toggle) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = moreText,
+                )
+            }
         }
-        OverlayListPopup(
-            show = showMenu,
-            alignment = PopupPositionProvider.Align.End,
+        DropdownMenu(
+            expanded = showMenu,
             onDismissRequest = { showMenu = false },
         ) {
-            ListPopupColumn {
-                val optionSize =
-                    (if (canOpenOtherAppStore) 1 else 0) +
-                            (if (canRedownload) 1 else 0) +
-                            (if (canCancelDownload) 1 else 0)
-                var optionIndex = 0
-                if (canOpenOtherAppStore) {
-                    DropdownImpl(
-                        text = stringResource(Res.string.open_in_other_app_store),
-                        optionSize = optionSize,
-                        isSelected = false,
-                        index = optionIndex++,
-                        onSelectedIndexChange = {
-                            showMenu = false
-                            onOpenOtherAppStore()
-                        },
-                    )
-                }
-                if (canRedownload) {
-                    DropdownImpl(
-                        text = stringResource(Res.string.reinstall),
-                        optionSize = optionSize,
-                        isSelected = false,
-                        index = optionIndex++,
-                        onSelectedIndexChange = {
-                            showMenu = false
-                            onRedownload()
-                        },
-                    )
-                }
-                if (canCancelDownload) {
-                    DropdownImpl(
-                        text = stringResource(Res.string.cancel_download),
-                        optionSize = optionSize,
-                        isSelected = false,
-                        index = optionIndex,
-                        onSelectedIndexChange = {
-                            showMenu = false
-                            onClearDownload()
-                        },
-                    )
-                }
+            if (canOpenOtherAppStore) {
+                val label = stringResource(Res.string.open_in_other_app_store)
+                DropdownMenuItem(
+                    text = { Text(text = label) },
+                    onClick = {
+                        showMenu = false
+                        onOpenOtherAppStore()
+                    },
+                )
+            }
+            if (canRedownload) {
+                val label = stringResource(Res.string.reinstall)
+                DropdownMenuItem(
+                    text = { Text(text = label) },
+                    onClick = {
+                        showMenu = false
+                        onRedownload()
+                    },
+                )
+            }
+            if (canCancelDownload) {
+                val label = stringResource(Res.string.cancel_download)
+                DropdownMenuItem(
+                    text = { Text(text = label) },
+                    onClick = {
+                        showMenu = false
+                        onClearDownload()
+                    },
+                )
             }
         }
     }
@@ -1538,6 +1715,7 @@ private fun DetailActionButton(
     onCancel: (String) -> Unit,
     minHeight: Dp,
     modifier: Modifier = Modifier,
+    insideMargin: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
 ) {
     val downloadState = downloadStateProvider.value
     if (downloadState == null) {
@@ -1546,13 +1724,13 @@ private fun DetailActionButton(
             onClick = onAction,
             enabled = enabled && actionKind != AppActionKind.RESERVE,
             colors = if (actionKind == AppActionKind.OPEN || actionKind == AppActionKind.RESERVE) {
-                ButtonDefaults.buttonColors()
+                AppButtonDefaults.neutral()
             } else {
-                ButtonDefaults.buttonColorsPrimary()
+                AppButtonDefaults.filled()
             },
-            cornerRadius = 100.dp,
+            cornerRadius = MarketShapeTokens.ButtonCorner,
             minHeight = minHeight,
-            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            insideMargin = insideMargin,
             modifier = modifier,
         )
     } else {
@@ -1567,7 +1745,7 @@ private fun DetailActionButton(
             onInstallDownloaded = onInstallDownloaded,
             onCancel = onCancel,
             minHeight = minHeight,
-            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            insideMargin = insideMargin,
             modifier = modifier,
         )
     }
@@ -1598,6 +1776,7 @@ private fun SaveableImageBox(
     content: @Composable () -> Unit,
 ) {
     var showMenu by remember(url, fileName) { mutableStateOf(false) }
+    val saveText = stringResource(Res.string.save_image)
     Box(
         modifier = Modifier.saveImageOnLongPress(
             url = url,
@@ -1607,23 +1786,17 @@ private fun SaveableImageBox(
         ),
     ) {
         content()
-        OverlayListPopup(
-            show = showMenu,
-            alignment = PopupPositionProvider.Align.End,
+        DropdownMenu(
+            expanded = showMenu,
             onDismissRequest = { showMenu = false },
         ) {
-            ListPopupColumn {
-                DropdownImpl(
-                    text = stringResource(Res.string.save_image),
-                    optionSize = 1,
-                    isSelected = false,
-                    index = 0,
-                    onSelectedIndexChange = {
-                        showMenu = false
-                        onSaveImage(url, fileName)
-                    },
-                )
-            }
+            DropdownMenuItem(
+                text = { Text(text = saveText) },
+                onClick = {
+                    showMenu = false
+                    onSaveImage(url, fileName)
+                },
+            )
         }
     }
 }
@@ -1736,7 +1909,7 @@ private fun ScreenshotViewer(
             val cardRect = cardBounds[shot.url]?.translate(-viewerOrigin)
                 ?: offscreenCardRect(screenshots, pagerState.currentPage, cardBounds, containerWidth, viewerOrigin)
                 ?: fitRect
-            // 圆角量化：squircleClip 每次半径变化都要重建笔刷
+            // 圆角量化：每次半径变化都要重建形状
             val cornerDp by remember(progress) {
                 derivedStateOf { (SCREENSHOT_CORNER_DP * (1f - progress.value)).roundToInt() }
             }
@@ -1747,7 +1920,7 @@ private fun ScreenshotViewer(
                 placeholderMemoryCacheUrl = shot.url,
                 modifier = Modifier
                     .animatedRect { lerp(cardRect, fitRect, progress.value) }
-                    .squircleClip(cornerDp.dp),
+                    .clip(RoundedCornerShape(cornerDp.dp)),
             )
         }
     }
@@ -1788,8 +1961,8 @@ private fun CommentContent(comment: AppComment) {
         CommentHeader(comment)
         Text(
             text = body,
-            color = MiuixTheme.colorScheme.onSurface,
-            style = MiuixTheme.textStyles.paragraph.copy(lineHeight = 22.sp),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
         )
     }
 }
@@ -1803,8 +1976,8 @@ private fun CommentHeader(comment: AppComment) {
     ) {
         Text(
             text = comment.userName,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            style = MiuixTheme.textStyles.headline1.copy(lineHeight = 22.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1821,8 +1994,8 @@ private fun CommentHeader(comment: AppComment) {
                                 Res.drawable.ic_star_fill
                             ),
                             contentDescription = null,
-                            tint = Color(0xFFFFC100),
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
                         )
                     } else {
                         Icon(
@@ -1830,8 +2003,8 @@ private fun CommentHeader(comment: AppComment) {
                                 Res.drawable.ic_star
                             ),
                             contentDescription = null,
-                            tint = MiuixTheme.colorScheme.onSurface.copy(0.2f),
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
@@ -1840,11 +2013,32 @@ private fun CommentHeader(comment: AppComment) {
     }
 }
 
+/** 评分 + 评论数摘要：详情页评论区与评论面板共用。 */
+@Composable
+private fun RatingSummary(
+    score: String,
+    commentsLabel: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = score,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = commentsLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
 @Composable
 private fun InfoLine(
     label: String,
     value: String,
-    valueColor: Color = MiuixTheme.colorScheme.onSurface,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
     onValueClick: (() -> Unit)? = null,
 ) {
     if (value.isBlank()) return
@@ -1855,8 +2049,8 @@ private fun InfoLine(
     ) {
         Text(
             text = label,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            style = MiuixTheme.textStyles.headline1.copy(lineHeight = 22.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
         )
@@ -1880,7 +2074,7 @@ private fun InfoLine(
                 text = value,
                 modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
                 color = valueColor,
-                style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.End,
                 maxLines = 1,
             )

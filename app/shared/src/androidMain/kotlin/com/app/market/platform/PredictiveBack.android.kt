@@ -15,9 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 actual fun isPredictiveBackSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
-@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
-actual fun isBlurSettingSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-
 @Composable
 actual fun ApplyPredictiveBackPreference(enabled: Boolean) {
     if (!isPredictiveBackSupported()) return

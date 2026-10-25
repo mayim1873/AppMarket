@@ -3,17 +3,32 @@ package com.app.market.ui.component
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -25,14 +40,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -53,25 +66,17 @@ import com.app.market.resources.video_play
 import com.app.market.resources.video_unmute
 import com.app.market.ui.util.animatedRect
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
+import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Pause
-import top.yukonga.miuix.kmp.icon.extended.Play
-import top.yukonga.miuix.kmp.icon.extended.VolumeOff
-import top.yukonga.miuix.kmp.icon.extended.VolumeUp
-import top.yukonga.miuix.kmp.squircle.squircleClip
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.roundToInt
 
 private const val VIDEO_VIEWER_ANIM_MS = 400
 private const val VIDEO_VIEWER_CORNER_DP = 16f
+
+/** 播放进度条使用的取值区间：0..1000。 */
+private const val VIDEO_PROGRESS_RANGE = 1000f
 
 @Composable
 fun AppVideoViewer(
@@ -146,8 +151,9 @@ fun AppVideoViewer(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
+                    // animatedRect 必须在裁剪之前，否则裁剪区停在原点
                     .animatedRect { lerp(cardRect, fitRect, progress.value) }
-                    .squircleClip(cornerDp.dp),
+                    .clip(RoundedCornerShape(cornerDp.dp)),
             )
         }
     }
@@ -155,7 +161,7 @@ fun AppVideoViewer(
 
 @Composable
 private fun VideoPlaybackLayer(
-    playerState: io.github.kdroidfilter.composemediaplayer.VideoPlayerState,
+    playerState: VideoPlayerState,
     onClose: () -> Unit,
 ) {
     Box(
@@ -173,9 +179,12 @@ private fun VideoPlaybackLayer(
         )
 
         if (playerState.isLoading) {
-            InfiniteProgressIndicator(
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp),
                 color = Color.White,
-                modifier = Modifier.align(Alignment.Center),
+                strokeWidth = 3.dp,
             )
         }
 
@@ -183,39 +192,68 @@ private fun VideoPlaybackLayer(
             Text(
                 text = stringResource(Res.string.video_load_failed),
                 color = Color.White,
-                style = MiuixTheme.textStyles.main,
-                modifier = Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp),
             )
         }
 
-        IconButton(
-            onClick = onClose,
+        // 关闭按钮：深色圆形底衬，保证在任意画面上都能看清
+        Surface(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.45f),
+            contentColor = Color.White,
         ) {
-            Icon(
-                imageVector = MiuixIcons.Close,
-                contentDescription = stringResource(Res.string.video_close),
-                tint = Color.White,
-            )
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(Res.string.video_close),
+                    tint = Color.White,
+                )
+            }
         }
 
+        VideoControlBar(
+            playerState = playerState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+}
+
+/** 底部播放控制浮层：播放 / 暂停、进度、时间、静音。 */
+@Composable
+private fun VideoControlBar(
+    playerState: VideoPlayerState,
+    modifier: Modifier = Modifier,
+) {
+    val playing = playerState.isPlaying
+    var volumeBeforeMute by remember { mutableFloatStateOf(playerState.volume) }
+    val muted = playerState.volume == 0f
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Black.copy(alpha = 0.55f),
+        contentColor = Color.White,
+    ) {
         Row(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.4f))
+                // 控制条自身吞掉点击，避免冒泡到播放 / 暂停层
                 .pointerInput(Unit) { detectTapGestures { } }
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val playing = playerState.isPlaying
             IconButton(onClick = { if (playing) playerState.pause() else playerState.play() }) {
                 Icon(
-                    imageVector = if (playing) MiuixIcons.Pause else MiuixIcons.Play,
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = stringResource(
                         if (playing) Res.string.video_pause else Res.string.video_play
                     ),
@@ -225,7 +263,7 @@ private fun VideoPlaybackLayer(
             Text(
                 text = playerState.positionText,
                 color = Color.White,
-                style = MiuixTheme.textStyles.footnote1,
+                style = MaterialTheme.typography.labelMedium,
             )
             VideoProgressBar(
                 progress = { playerState.sliderPos },
@@ -238,10 +276,8 @@ private fun VideoPlaybackLayer(
             Text(
                 text = playerState.durationText,
                 color = Color.White,
-                style = MiuixTheme.textStyles.footnote1,
+                style = MaterialTheme.typography.labelMedium,
             )
-            var volumeBeforeMute by remember { mutableFloatStateOf(playerState.volume) }
-            val muted = playerState.volume == 0f
             IconButton(
                 onClick = {
                     if (muted) {
@@ -253,7 +289,7 @@ private fun VideoPlaybackLayer(
                 },
             ) {
                 Icon(
-                    imageVector = if (muted) MiuixIcons.VolumeOff else MiuixIcons.VolumeUp,
+                    imageVector = if (muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
                     contentDescription = stringResource(
                         if (muted) Res.string.video_unmute else Res.string.video_mute
                     ),
@@ -264,6 +300,7 @@ private fun VideoPlaybackLayer(
     }
 }
 
+/** 进度条：M3 Slider，拖动时持续 seek，松手结束。 */
 @Composable
 private fun VideoProgressBar(
     progress: () -> Float,
@@ -271,46 +308,15 @@ private fun VideoProgressBar(
     onSeekFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .height(24.dp)
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    onSeek((offset.x / size.width).coerceIn(0f, 1f) * 1000f)
-                    onSeekFinished()
-                }
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { change, _ ->
-                        change.consume()
-                        onSeek((change.position.x / size.width).coerceIn(0f, 1f) * 1000f)
-                    },
-                    onDragEnd = onSeekFinished,
-                    onDragCancel = onSeekFinished,
-                )
-            }
-            .drawBehind {
-                val trackHeight = 3.dp.toPx()
-                val radius = CornerRadius(trackHeight / 2f)
-                val top = (size.height - trackHeight) / 2f
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.3f),
-                    topLeft = Offset(0f, top),
-                    size = Size(size.width, trackHeight),
-                    cornerRadius = radius,
-                    style = Fill,
-                )
-                val filled = (progress() / 1000f).coerceIn(0f, 1f) * size.width
-                if (filled > 0f) {
-                    drawRoundRect(
-                        color = Color.White,
-                        topLeft = Offset(0f, top),
-                        size = Size(filled, trackHeight),
-                        cornerRadius = radius,
-                        style = Fill,
-                    )
-                }
-            },
+    Slider(
+        value = (progress() / VIDEO_PROGRESS_RANGE).coerceIn(0f, 1f),
+        onValueChange = { onSeek(it * VIDEO_PROGRESS_RANGE) },
+        onValueChangeFinished = onSeekFinished,
+        modifier = modifier,
+        colors = SliderDefaults.colors(
+            thumbColor = Color.White,
+            activeTrackColor = Color.White,
+            inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+        ),
     )
 }

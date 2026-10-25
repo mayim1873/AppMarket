@@ -2,20 +2,30 @@ package com.app.market.ui.component
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.modifiers.TextAutoSizeLayoutScope
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
@@ -39,19 +49,70 @@ import com.app.market.resources.install
 import com.app.market.resources.installing_short
 import com.app.market.resources.waiting_install_confirmation
 import com.app.market.ui.model.AppActionKind
+import com.app.market.ui.theme.MarketShapeTokens
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonColors
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButtonColors
-import top.yukonga.miuix.kmp.squircle.squircleSurface
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-// App-wide replacement for miuix Button/TextButton: same API surface, but labels render at
-// body2 (14.sp) instead of the stock 17.sp button style, shrinking down to 8.sp before
-// ellipsizing when the button is narrower than its text.
+/** 按钮标签最小字号：超宽时自动缩字至 8sp 再省略。 */
 private val AppButtonMinFontSize = 8.sp
+
+/** 应用内统一的按钮配色：容器色 / 内容色 + 禁用态。 */
+@Immutable
+data class AppButtonColors(
+    val containerColor: Color,
+    val contentColor: Color,
+    val disabledContainerColor: Color,
+    val disabledContentColor: Color,
+)
+
+object AppButtonDefaults {
+    val MinWidth: Dp = 64.dp
+    val MinHeight: Dp = 40.dp
+    val InsideMargin: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+
+    /** 主按钮：高对比填充（primary）。 */
+    @Composable
+    fun filled(): AppButtonColors = AppButtonColors(
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    )
+
+    /** 次按钮：中性容器（surfaceContainerHighest）。 */
+    @Composable
+    fun neutral(): AppButtonColors = AppButtonColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    )
+
+    /** 强调次按钮：主色浅容器（primaryContainer 的轻量版）。 */
+    @Composable
+    fun tonal(): AppButtonColors {
+        val container = if (isSystemInDarkTheme()) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                .compositeOver(MaterialTheme.colorScheme.surface)
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        }
+        return AppButtonColors(
+            containerColor = container,
+            contentColor = MaterialTheme.colorScheme.primary,
+            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+    }
+
+    /** 文本按钮：透明容器。 */
+    @Composable
+    fun text(): AppButtonColors = AppButtonColors(
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.primary,
+        disabledContainerColor = Color.Transparent,
+        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    )
+}
 
 @Composable
 fun AppButton(
@@ -59,11 +120,11 @@ fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    cornerRadius: Dp = ButtonDefaults.CornerRadius,
-    minWidth: Dp = ButtonDefaults.MinWidth,
-    minHeight: Dp = ButtonDefaults.MinHeight,
-    colors: ButtonColors = ButtonDefaults.buttonColors(),
-    insideMargin: PaddingValues = ButtonDefaults.InsideMargin,
+    cornerRadius: Dp = MarketShapeTokens.ButtonCorner,
+    minWidth: Dp = AppButtonDefaults.MinWidth,
+    minHeight: Dp = AppButtonDefaults.MinHeight,
+    colors: AppButtonColors = AppButtonDefaults.filled(),
+    insideMargin: PaddingValues = AppButtonDefaults.InsideMargin,
 ) {
     AppButton(
         onClick = onClick,
@@ -84,24 +145,30 @@ fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    cornerRadius: Dp = ButtonDefaults.CornerRadius,
-    minWidth: Dp = ButtonDefaults.MinWidth,
-    minHeight: Dp = ButtonDefaults.MinHeight,
-    colors: ButtonColors = ButtonDefaults.buttonColors(),
-    insideMargin: PaddingValues = ButtonDefaults.InsideMargin,
+    cornerRadius: Dp = MarketShapeTokens.ButtonCorner,
+    minWidth: Dp = AppButtonDefaults.MinWidth,
+    minHeight: Dp = AppButtonDefaults.MinHeight,
+    colors: AppButtonColors = AppButtonDefaults.filled(),
+    insideMargin: PaddingValues = AppButtonDefaults.InsideMargin,
     content: @Composable RowScope.() -> Unit,
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        cornerRadius = cornerRadius,
-        minWidth = minWidth,
-        minHeight = minHeight,
-        colors = colors,
-        insideMargin = insideMargin,
-        content = content,
-    )
+    val container = if (enabled) colors.containerColor else colors.disabledContainerColor
+    val contentColor = if (enabled) colors.contentColor else colors.disabledContentColor
+    Row(
+        modifier = modifier
+            .widthIn(min = minWidth)
+            .heightIn(min = minHeight)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(container)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(insideMargin),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            content()
+        }
+    }
 }
 
 @Composable
@@ -110,20 +177,12 @@ fun AppTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    cornerRadius: Dp = ButtonDefaults.CornerRadius,
-    minWidth: Dp = ButtonDefaults.MinWidth,
-    minHeight: Dp = ButtonDefaults.MinHeight,
-    colors: TextButtonColors = ButtonDefaults.textButtonColors(),
-    insideMargin: PaddingValues = ButtonDefaults.InsideMargin,
+    cornerRadius: Dp = MarketShapeTokens.ButtonCorner,
+    minWidth: Dp = 0.dp,
+    minHeight: Dp = AppButtonDefaults.MinHeight,
+    colors: AppButtonColors = AppButtonDefaults.text(),
+    insideMargin: PaddingValues = AppButtonDefaults.InsideMargin,
 ) {
-    val mappedColors = remember(colors) {
-        ButtonColors(
-            color = colors.color,
-            disabledColor = colors.disabledColor,
-            contentColor = colors.textColor,
-            disabledContentColor = colors.disabledTextColor,
-        )
-    }
     AppButton(
         onClick = onClick,
         modifier = modifier,
@@ -131,21 +190,21 @@ fun AppTextButton(
         cornerRadius = cornerRadius,
         minWidth = minWidth,
         minHeight = minHeight,
-        colors = mappedColors,
+        colors = colors,
         insideMargin = insideMargin,
     ) {
         AppButtonText(text)
     }
 }
 
-/** Standalone button label for custom [AppButton] content; color defaults to the button's content color. */
+/** 独立的按钮文本，颜色默认继承按钮内容色。 */
 @Composable
 fun AppButtonText(
     text: String,
     modifier: Modifier = Modifier,
     color: Color? = null,
 ) {
-    val style = MiuixTheme.textStyles.body2
+    val style = MaterialTheme.typography.labelLarge
     val maxFontSize = style.fontSize.takeUnless { it == TextUnit.Unspecified } ?: 14.sp
     val minFontSize = if (maxFontSize.value < AppButtonMinFontSize.value) maxFontSize else AppButtonMinFontSize
     Text(
@@ -180,9 +239,8 @@ private data class DescendingSpAutoSize(
     }
 }
 
-// Compact action-button metrics, matching the payload_extract_gui look.
-private val ActionButtonMinHeight = 32.dp
-private val ActionButtonInsideMargin = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+private val ActionButtonMinHeight = 34.dp
+private val ActionButtonInsideMargin = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
 private val ActiveDownloadPhases = setOf(
     DownloadPhase.QUEUED,
     DownloadPhase.DOWNLOADING,
@@ -202,7 +260,7 @@ fun AppCompactButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: ButtonColors = appTintedButtonColors(),
+    colors: AppButtonColors = AppButtonDefaults.tonal(),
     minHeight: Dp = ActionButtonMinHeight,
     insideMargin: PaddingValues = ActionButtonInsideMargin,
 ) {
@@ -211,22 +269,12 @@ fun AppCompactButton(
         onClick = onClick,
         enabled = enabled,
         colors = colors,
-        cornerRadius = 100.dp,
+        cornerRadius = MarketShapeTokens.ButtonCorner,
         minHeight = minHeight,
         insideMargin = insideMargin,
         modifier = modifier,
     )
 }
-
-@Composable
-private fun tintedContainerColor(): Color =
-    MiuixTheme.colorScheme.primary.copy(alpha = if (isSystemInDarkTheme()) 0.2f else 0.08f)
-
-@Composable
-private fun appTintedButtonColors(): ButtonColors = ButtonDefaults.buttonColors(
-    color = tintedContainerColor(),
-    contentColor = MiuixTheme.colorScheme.primary,
-)
 
 @Composable
 fun AppActionButton(
@@ -243,7 +291,7 @@ fun AppActionButton(
     onInstallDownloaded: (String) -> Unit,
     onCancel: (String) -> Unit,
 ) {
-    // 无账号体系可执行预约,按钮仅作状态展示。
+    // 无账号体系可执行预约，按钮仅作状态展示。
     if (actionKind == AppActionKind.RESERVE) {
         AppCompactButton(
             text = actionText,
@@ -257,7 +305,7 @@ fun AppActionButton(
     }
 
     val activePhase = downloadState?.phase in ActiveDownloadPhases
-    // Active transfer or install: the button itself becomes the progress indicator.
+    // 下载 / 安装进行中：按钮本身成为进度指示器。
     if (downloadState != null && activePhase) {
         val percent = downloadState.progress
         DownloadProgressButton(
@@ -283,30 +331,27 @@ fun AppActionButton(
     }
 
     val buttonText = when {
-        // Downloaded and waiting for the user to install it.
+        // 已下载完成，等待用户安装。
         downloadState?.isComplete == true -> stringResource(Res.string.install)
         else -> actionText
     }
     val click: () -> Unit =
         if (downloadState?.isComplete == true) ({ onInstallDownloaded(packageName) }) else onAction
-    // "Open" (already installed) keeps the neutral look; actionable states use the tinted-primary style.
+    // 「打开」（已安装）保持中性外观；可执行动作使用填充高亮样式。
     val neutral = downloadState == null && actionKind == AppActionKind.OPEN
     AppCompactButton(
         text = buttonText,
         onClick = click,
         enabled = enabled,
         modifier = modifier,
-        colors = if (neutral) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),
+        colors = if (neutral) AppButtonDefaults.neutral() else AppButtonDefaults.filled(),
         minHeight = minHeight,
         insideMargin = insideMargin,
     )
 }
 
 /**
- * Download button whose solid-primary fill grows left -> right with [fraction] over a translucent
- * base. The percentage label is rendered twice — once in the base-contrast color, once in the
- * fill-contrast color clipped to the filled region — so the text auto-splits between black/white
- * at the moving fill boundary. The fast-changing [fraction] is read only inside draw blocks.
+ * 下载进度按钮：主色填充从左向右生长，文字在填充边界处切换对比色。
  */
 @Composable
 private fun DownloadProgressButton(
@@ -317,10 +362,10 @@ private fun DownloadProgressButton(
     insideMargin: PaddingValues = ActionButtonInsideMargin,
     onClick: () -> Unit,
 ) {
-    val primary = MiuixTheme.colorScheme.primary
-    val base = tintedContainerColor()
-    val baseTextColor = contrastColor(base.compositeOver(MiuixTheme.colorScheme.surface))
-    val fillTextColor = contrastColor(primary)
+    val primary = MaterialTheme.colorScheme.primary
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val base = MaterialTheme.colorScheme.surfaceContainerHighest
+    val baseTextColor = if (base.luminance() > 0.5f) Color(0xFF1B1B22) else Color.White
     val animatedFraction = animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 300),
@@ -328,30 +373,31 @@ private fun DownloadProgressButton(
     )
     Box(
         modifier = modifier
-            .widthIn(min = ButtonDefaults.MinWidth)
+            .widthIn(min = AppButtonDefaults.MinWidth)
             .heightIn(min = minHeight)
-            .squircleSurface(color = base, cornerRadius = 100.dp)
+            .clip(RoundedCornerShape(MarketShapeTokens.ButtonCorner))
+            .drawBehind { drawRect(base) }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // Solid fill (draw phase reads the animated fraction).
+        // 主色填充（在绘制阶段读取动画值）。
         Box(
-            Modifier.matchParentSize().drawBehind {
-                val filledWidth = size.width * animatedFraction.value
-                if (filledWidth > 0f) drawRect(
-                    color = primary,
-                    size = Size(filledWidth, size.height)
-                )
-            },
+            Modifier
+                .matchParentSize()
+                .drawBehind {
+                    val filledWidth = size.width * animatedFraction.value
+                    if (filledWidth > 0f) {
+                        drawRect(color = primary, size = Size(filledWidth, size.height))
+                    }
+                },
         )
-        // Base label — visible over the translucent (unfilled) area. Size-defining child.
+        // 底色文字：在未填充区域可见，同时决定按钮尺寸。
         AppButtonText(
             text = label,
             color = baseTextColor,
             modifier = Modifier.padding(insideMargin),
         )
-        // Same label in the fill-contrast color, clipped to the filled region so it covers the
-        // base label only where the fill has reached.
+        // 填充区文字：裁剪到填充范围内，覆盖底色文字。
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -364,14 +410,9 @@ private fun DownloadProgressButton(
         ) {
             AppButtonText(
                 text = label,
-                color = fillTextColor,
+                color = onPrimary,
                 modifier = Modifier.padding(insideMargin),
             )
         }
     }
 }
-
-/** Black or white, whichever contrasts the given background luminance. */
-@Composable
-private fun contrastColor(background: Color): Color =
-    if (background.luminance() > 0.5f) MiuixTheme.colorScheme.primary else Color.White

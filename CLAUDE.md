@@ -1,32 +1,40 @@
 # AppMarket
 
-Kotlin Multiplatform（Android + Desktop）应用商店客户端，UI 使用 Compose Multiplatform + miuix（`top.yukonga.miuix.kmp`）。
+Kotlin Multiplatform（Android + Desktop）应用商店客户端，UI 使用 Compose Multiplatform + **Material 3 Expressive**（`androidx.compose.material3`，`MaterialExpressiveTheme`）。
+
+## UI 设计规范：主题
+
+主题入口：[MarketTheme.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/theme/MarketTheme.kt)
+
+- **颜色**：`MaterialExpressiveTheme` + 品牌高彩度色板（[MarketColorScheme.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/theme/MarketColorScheme.kt)）。Android 12+ 优先使用系统动态取色（Material You），`rememberPlatformColorScheme` 为 expect/actual 实现；桌面端回退品牌色板。界面颜色一律取 `MaterialTheme.colorScheme.*`，禁止硬编码色值。
+- **字体**：M3E 层级（[MarketTypography.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/theme/MarketTypography.kt)）。大标题 Bold + 收紧字距，标签 SemiBold。文字样式一律取 `MaterialTheme.typography.*`。
+- **形状**：大圆角是 M3E 的标志——卡片 28dp、内嵌卡片 20dp、按钮/标签胶囊形（[MarketShapes.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/theme/MarketShapes.kt)）。手搓圆角时引用 `MarketShapeTokens`，不要写字面量。
+- **动效**：`MotionScheme.expressive()`（弹簧驱动）。页面转场用 `AnimatedContent` 的共享轴位移 + 淡入淡出。
 
 ## UI 设计规范：垂直间距
 
-全局垂直间距体系（常量定义在 [MarketScaffold.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/component/MarketScaffold.kt)）：
+全局间距体系（常量定义在 [MarketScaffold.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/component/MarketScaffold.kt)）：
 
-- **页面出入距 `PageVerticalPadding` = 12dp**：所有滚动页面「顶栏底部 → 内容顶部」「内容末尾 → 页面底部」的额外间距，一律引用该常量，不写字面量。
-  - 出入距统一通过列表 `contentPadding` 实现（顶部 `顶栏 padding + PageVerticalPadding`、底部 `innerPadding/bottomPadding + PageVerticalPadding`），不用首 / 末 `Spacer` item 承载。
-  - `bottomPadding: Dp` 参数只出现在主 Tab 页签名里（外层 Scaffold 持有悬浮底栏，需透传其高度）；二级推入页一律用自己脚手架的 `innerPadding`，签名不带 `bottomPadding`。
-- **卡片 / 区块间距 = 20dp**：今日页网格 `spacedBy`、更新页汇总卡到列表、应用详情主列表 `spacedBy` 等。
-- **小标题 `SectionTitle`**（应用详情页直接用 `SmallTitle`，同一套规则）：
-  - 上方 20dp，由标题自身的 `topPadding` 参数提供；标题上方的元素一律不加自己的底边距；
-  - 紧贴顶栏时传 `topPadding = 0.dp`，只保留页面 12dp 出入距（详情页由列表 contentPadding 提供）；
-  - 标题 → 下方内容 8dp；水平 28dp（对齐卡片内容：12dp 卡片边距 + 16dp 内边距）。
-- **卡片自身不携带外部垂直边距**：垂直节奏统一由列表 / 区块的 spacing 提供，卡片带自身外边距会造成间距叠加不一致。
-- **特例**（不套用上述规则）：关于页（视差布局）、今日文章页（沉浸式）；更新 / 更新历史等页的行由 `CardSegmentContainer` 无缝拼接（`spacedBy(0)`）。
+- **页面出入距 `PageVerticalPadding` = 12dp**：滚动页面「顶栏底部 → 内容顶部」「内容末尾 → 页面底部」的额外间距，一律引用该常量。
+  - 出入距统一通过列表 `contentPadding` 实现（顶部 `innerPadding.calculateTopPadding() + PageVerticalPadding`、底部 `bottomPadding + PageVerticalPadding`）。
+  - `bottomPadding: Dp` 参数只出现在主 Tab 页签名里（外层 MainScreen 持有悬浮导航栏，需透传其高度）；二级推入页一律用脚手架自身的 `innerPadding`，签名不带 `bottomPadding`。
+- **卡片 / 区块间距 = 20dp**：网格 `spacedBy`、块间距、区块标题上方间距。列表内卡片间距用 12dp。
+- **页面水平内边距 = 16dp**：卡片贴边距 16dp；`SectionTitle` 用 20dp 与卡片内容形成轻微缩进层次。
+- **小标题 `SectionTitle`**：上方 20dp 由标题自身 `topPadding` 提供；标题到内容 8dp；水平 20dp。紧贴顶栏时传 `topPadding = 0.dp`。
+- **卡片自身不携带外部垂直边距**：垂直节奏由列表 spacing 提供。
 
 ## UI 规范：通用模式
 
-- **所有 UI 组件使用 miuix**（Card、TopAppBar、NavigationBar、SmallTitle 等）；miuix 组件内部已用 squircle 渲染圆角，直接用即可。
-- **自定义形状用 squircle modifier**：手搓形状不用 `clip(RoundedCornerShape)`，改用 `top.yukonga.miuix.kmp.squircle.*`——非点击纯色背景 `squircleBackground`、需裁剪的图片 `squircleClip`、可点击元素（涟漪裁进圆角）`squircleSurface`。关于页视差特效为既有特例。
-- **返回按钮统一 `MiuixIcons.Back`**。
-- **滚动容器三件套**：`.scrollEndHaptic().overScrollVertical().nestedScroll(scrollBehavior.nestedScrollConnection)`（无折叠行为的页面可省 nestedScroll）。
-- **顶栏 / 底栏毛玻璃**：`rememberBlurBackdrop()` + `blurActive` 判空 + 栏色 `if (blurActive) Color.Transparent else surface`，内容区应用 `layerBackdrop`（即脚手架回调给的 `backdropModifier`，必须挂到滚动内容或其容器上）。该模式已封装在 [MarketScaffold.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/component/MarketScaffold.kt) 的各脚手架里，新页面优先复用现成脚手架而不是手搓 Scaffold。
-- **宽屏适配**：以 `rememberIsWideScreen()` 为唯一判定；宽屏用可展开 `NavigationRail`（`rememberNavigationRailState()`），顶栏走 `AdaptiveTopAppBar`（宽屏固定小顶栏、窄屏大标题可折叠）。
-- **多行卡片拆独立 lazy item**：LazyColumn 里禁止单 item 塞整卡多行；列表行用 `CardSegmentContainer`（isFirst/isLast 分角）拼成视觉连续的卡片，每行独立 item 以保证滚动性能。
-- **长内容 Dialog**：内容 `Column` 用 `heightIn(max = …)` 限高 + 内部 `verticalScroll`，按钮作为非滚动子项固定底部（参照 App.kt 安装失败弹窗）。
+- **所有 UI 使用 material3**，不再依赖任何 miuix 组件。新增界面优先复用 `ui/component/*` 中的封装。
+- **脚手架**：二级页用 `MarketScaffold(title, onBack)`；主页签用 `MainTabScaffold(title)`。两者都提供 `(innerPadding/topPadding, backdropModifier 占位, scrollBehavior)` 回调，列表挂 `Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)`。
+- **顶栏**：`LargeTopAppBar`（窄屏可折叠）/ `TopAppBar`（宽屏固定），由脚手架统一处理，不手搓。
+- **卡片**：`MarketCard`（28dp 圆角、`surfaceContainerLow` 容器色、无阴影靠色调分层）；被拆成多个 lazy item 的连续卡片用 `CardSegmentContainer(isFirst, isLast)` + `MarketDivider`。
+- **返回按钮统一** `Icons.AutoMirrored.Filled.ArrowBack`（脚手架内已封装）。
+- **图标**：`androidx.compose.material.icons`（`Icons.Filled.*` / `Icons.AutoMirrored.*`）。
+- **宽屏适配**：以 `rememberIsWideScreen()` 为唯一判定；宽屏用 `MarketNavigationRail`，窄屏用 `MarketNavigationBar`（M3E `ShortNavigationBar` 悬浮胶囊导航）。
+- **多行卡片拆独立 lazy item**：`CardSegmentContainer` 拼视觉连续卡片，每行独立 item 保证滚动性能。
+- **设置页**：用 `SettingsGroup` / `SettingsRow` / `SettingsSwitchRow` / `SettingsArrowRow` / `SettingsDropdownRow`，不要手写行布局。
+- **长内容 Dialog**：`MarketDialog` 内容用 `heightIn(max = …)` 限高 + 内部 `verticalScroll`，按钮固定底部；确认类弹窗优先 `MarketConfirmDialog`。
 - **用户反馈**：轻量操作结果用 `uiPlatform.showToast(message)`。
 - **i18n**：所有用户可见字符串走 Compose Resources（`stringResource(Res.string.xxx)`），禁止硬编码；日志消息英文，代码注释中文。
 - **Flow 收集**：屏幕一律 `collectAsStateWithLifecycle()`，不用 `collectAsState()`。
@@ -34,9 +42,10 @@ Kotlin Multiplatform（Android + Desktop）应用商店客户端，UI 使用 Com
 
 ## UI 设计规范：按钮
 
-- 全部按钮使用 [AppButton.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/component/AppButton.kt) 中的 `AppButton` / `AppTextButton` / `AppCompactButton` / `AppActionButton`，不要直接使用 miuix 的 `Button` / `TextButton`。
-- 按钮文字统一经 `AppButtonText`：`body2`（14sp），超宽时自动缩字至最小 8sp 再省略号。
-- 调整按钮样式只改 AppButton.kt 一处；不通过主题 `textStyles` 覆盖实现。
+- 全部按钮使用 [AppButton.kt](app/shared/src/commonMain/kotlin/com/app/market/ui/component/AppButton.kt) 中的 `AppButton` / `AppTextButton` / `AppCompactButton` / `AppActionButton`，不要直接使用 material3 的 `Button` / `TextButton`。
+- 按钮配色用 `AppButtonDefaults.filled()` / `neutral()` / `tonal()` / `text()`，不要引用 material3 的 `ButtonDefaults.colors(...)`。
+- 按钮文字统一经 `AppButtonText`：`labelLarge`（14sp），超宽时自动缩字至最小 8sp 再省略号。
+- 调整按钮样式只改 AppButton.kt 一处。
 
 ## 构建验证
 

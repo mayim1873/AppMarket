@@ -1,11 +1,11 @@
 package com.app.market
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -40,23 +40,18 @@ import com.app.market.resources.install_permission_message
 import com.app.market.resources.install_permission_settings_unavailable
 import com.app.market.resources.install_permission_title
 import com.app.market.resources.installer_delta_fallback_toast
+import com.app.market.ui.component.AppButton
 import com.app.market.ui.component.AppTextButton
+import com.app.market.ui.component.MarketDialog
 import com.app.market.ui.navigation.AppNavigation
-import com.app.market.ui.theme.LocalEnableBlur
-import com.app.market.ui.theme.LocalEnableFloatingBottomBar
-import com.app.market.ui.theme.LocalEnableFloatingBottomBarBlur
+import com.app.market.ui.theme.MarketTheme
 import com.app.market.ui.theme.LocalEnableNavigationBadge
 import com.app.market.ui.util.LocalStripAppNameSubtitle
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.ColorSchemeMode
-import top.yukonga.miuix.kmp.theme.LocalContentColor
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.ThemeController
-import top.yukonga.miuix.kmp.window.WindowDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 
 @Composable
 fun App(
@@ -73,9 +68,6 @@ fun App(
     val uiPlatform = koinInject<UiPlatform>()
     val updatePrefs = koinInject<UpdatePreferencesRepository>()
     val themePrefs = koinInject<ThemePreferencesRepository>()
-    val enableBlur by themePrefs.enableBlur.collectAsStateWithLifecycle()
-    val enableFloatingBottomBar by themePrefs.enableFloatingBottomBar.collectAsStateWithLifecycle()
-    val enableFloatingBottomBarBlur by themePrefs.enableFloatingBottomBarBlur.collectAsStateWithLifecycle()
     val enableNavigationBadge by themePrefs.enableNavigationBadge.collectAsStateWithLifecycle()
     val enablePredictiveBack by themePrefs.enablePredictiveBack.collectAsStateWithLifecycle()
     val pageScale by themePrefs.pageScale.collectAsStateWithLifecycle()
@@ -99,20 +91,16 @@ fun App(
         }
     }
     LaunchedEffect(Unit) { runCatching { profileStore.syncFromServerIfDue() } }
-    val controller = remember { ThemeController(ColorSchemeMode.System) }
     ApplyPredictiveBackPreference(enablePredictiveBack)
-    MiuixTheme(controller = controller) {
+
+    MarketTheme {
         val systemDensity = LocalDensity.current
         val scaledDensity = remember(systemDensity, pageScale) {
             Density(systemDensity.density * pageScale, systemDensity.fontScale)
         }
         CompositionLocalProvider(
-            LocalContentColor provides MiuixTheme.colorScheme.onBackground,
             LocalStripAppNameSubtitle provides stripAppNameSubtitle,
             LocalDensity provides scaledDensity,
-            LocalEnableBlur provides enableBlur,
-            LocalEnableFloatingBottomBar provides enableFloatingBottomBar,
-            LocalEnableFloatingBottomBarBlur provides enableFloatingBottomBarBlur,
             LocalEnableNavigationBadge provides enableNavigationBadge,
         ) {
             AppNavigation(
@@ -149,32 +137,28 @@ private fun InstallFailureDialog(
     message: String,
     onDismiss: () -> Unit,
 ) {
-    WindowDialog(
+    MarketDialog(
         show = show,
         title = stringResource(Res.string.install_failed_title),
         onDismissRequest = onDismiss,
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        SelectionContainer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 320.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
-            SelectionContainer(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Text(
-                    text = message,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-            }
-            AppTextButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = stringResource(Res.string.confirm),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-                onClick = onDismiss,
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        AppTextButton(
+            modifier = Modifier.fillMaxWidth(),
+            text = stringResource(Res.string.confirm),
+            onClick = onDismiss,
+        )
     }
 }
 
@@ -184,30 +168,28 @@ private fun UnknownSourcesPermissionDialog(
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    WindowDialog(
+    MarketDialog(
         show = show,
         title = stringResource(Res.string.install_permission_title),
         onDismissRequest = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(Res.string.install_permission_message),
-                color = MiuixTheme.colorScheme.onSurface,
+        Text(
+            text = stringResource(Res.string.install_permission_message),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            AppTextButton(
+                modifier = Modifier.weight(1f),
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss,
             )
-            Row(modifier = Modifier.fillMaxWidth()) {
-                AppTextButton(
-                    modifier = Modifier.weight(1f),
-                    text = stringResource(Res.string.cancel),
-                    onClick = onDismiss,
-                )
-                Spacer(Modifier.width(16.dp))
-                AppTextButton(
-                    modifier = Modifier.weight(1f),
-                    text = stringResource(Res.string.go_to_settings),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    onClick = onOpenSettings,
-                )
-            }
+            Spacer(Modifier.width(12.dp))
+            AppButton(
+                modifier = Modifier.weight(1f),
+                text = stringResource(Res.string.go_to_settings),
+                onClick = onOpenSettings,
+            )
         }
     }
 }

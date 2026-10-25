@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -31,6 +34,12 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,7 +51,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -54,7 +63,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.market.domain.model.market.MarketAppInfo
 import com.app.market.domain.model.today.TodayArticle
@@ -67,10 +75,9 @@ import com.app.market.resources.view
 import com.app.market.ui.component.AppAsyncImage
 import com.app.market.ui.component.AppButton
 import com.app.market.ui.component.AppIcon
-import com.app.market.ui.component.HidingMainTabScaffold
 import com.app.market.ui.component.LoadingBox
 import com.app.market.ui.component.PageVerticalPadding
-import com.app.market.ui.theme.LocalEnableFloatingBottomBar
+import com.app.market.ui.theme.MarketShapeTokens
 import com.app.market.ui.util.appDisplayName
 import com.app.market.ui.util.todayAwardLabel
 import com.app.market.ui.util.todayAppSummary
@@ -78,19 +85,15 @@ import com.app.market.viewmodel.TodayViewModel
 import com.app.market.viewmodel.UpdatesViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import kotlin.math.ceil
 
-private val PaperCardRadius = 16.dp
+private val TodayCardRadius = MarketShapeTokens.CardCorner
 private val TodayGridMinCellWidth = 320.dp
 
+/**
+ * 今日页：M3E 沉浸式信息流。页面自绘大标题（随内容滚动），瀑布卡片使用 28dp 圆角，
+ * 封面图叠加同色系渐变蒙版承载编辑文案。
+ */
 @Composable
 fun TodayTab(
     viewModel: TodayViewModel,
@@ -106,7 +109,7 @@ fun TodayTab(
     val pendingUpdates =
         if (updateState != null && !updateState.loading) updateState.updates else emptyList()
     val showUpdatesCard = pendingUpdates.isNotEmpty()
-    val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     LaunchedEffect(showUpdatesCard) {
         if (listState.firstVisibleItemIndex <= 1 && listState.firstVisibleItemScrollOffset == 0) {
@@ -131,108 +134,94 @@ fun TodayTab(
             .collect { shouldLoadMore -> if (shouldLoadMore) viewModel.loadMore() }
     }
 
-    HidingMainTabScaffold(
-        title = stringResource(Res.string.nav_today),
-        bottomTransitionHeight = if (enableFloatingBottomBar) {
-            bottomPadding + PageVerticalPadding
-        } else {
-            0.dp
-        },
-    ) { topPadding, backdropModifier, scrollBehavior ->
-        val initialLoading = state.feedLoading && state.feed.items.isEmpty()
-        Crossfade(
-            targetState = initialLoading,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MiuixTheme.colorScheme.surface)
-                .then(backdropModifier),
-            label = "today",
-        ) { loading ->
-            if (loading) {
-                LoadingBox(
-                    Modifier.fillMaxSize().padding(
-                        top = topPadding + PageVerticalPadding,
-                        bottom = bottomPadding + PageVerticalPadding,
-                    ),
-                )
-                return@Crossfade
-            }
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(TodayGridMinCellWidth),
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .scrollEndHaptic()
-                    .overScrollVertical()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = topPadding + PageVerticalPadding,
+    val initialLoading = state.feedLoading && state.feed.items.isEmpty()
+    Crossfade(
+        targetState = initialLoading,
+        modifier = Modifier.fillMaxSize(),
+        label = "today",
+    ) { loading ->
+        if (loading) {
+            LoadingBox(
+                Modifier.fillMaxSize().padding(
+                    top = statusBarTop + PageVerticalPadding,
                     bottom = bottomPadding + PageVerticalPadding,
                 ),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                if (showUpdatesCard) {
-                    item(
-                        key = "updates",
-                        span = { GridItemSpan(maxLineSpan) },
+            )
+            return@Crossfade
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(TodayGridMinCellWidth),
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = statusBarTop + 8.dp,
+                bottom = bottomPadding + PageVerticalPadding,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    text = stringResource(Res.string.nav_today),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            if (showUpdatesCard) {
+                item(
+                    key = "updates",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    var pendingCardVisible by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { pendingCardVisible = true }
+                    AnimatedVisibility(
+                        visible = pendingCardVisible,
+                        enter = fadeIn(tween(220)) +
+                                expandVertically(tween(300), expandFrom = Alignment.Top),
                     ) {
-                        var pendingCardVisible by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) { pendingCardVisible = true }
-                        AnimatedVisibility(
-                            visible = pendingCardVisible,
-                            enter = fadeIn(tween(220)) +
-                                    expandVertically(tween(300), expandFrom = Alignment.Top),
-                        ) {
-                            PendingUpdatesCard(
-                                updates = pendingUpdates,
-                                onClick = onClickViewUpdates,
-                                modifier = Modifier.padding(bottom = 20.dp),
-                            )
-                        }
-                    }
-                }
-                items(state.feed.items, key = { "feed-${it.rId.ifBlank { it.articleLink }}" }) { item ->
-                    FeaturedArticleCard(
-                        item = item,
-                        fullCoverOverlay = state.source.capabilities.todayFullCoverOverlay,
-                        modifier = Modifier
-                            .animateItem(placementSpec = null)
-                            .padding(bottom = 20.dp),
-                    ) {
-                        openArticle(item, onClickArticle)
-                    }
-                }
-                if (state.feedLoading || state.feedLoadingMore) {
-                    item(
-                        key = "feed-loading",
-                        span = { GridItemSpan(maxLineSpan) },
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            InfiniteProgressIndicator(size = 24.dp)
-                        }
-                    }
-                }
-                if (state.feedError.isNotBlank()) {
-                    item(
-                        key = "feed-error",
-                        span = { GridItemSpan(maxLineSpan) },
-                    ) {
-                        Text(
-                            text = state.feedError,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(onClick = viewModel::retryFeed)
-                                .padding(16.dp),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
-                            textAlign = TextAlign.Center,
+                        PendingUpdatesCard(
+                            updates = pendingUpdates,
+                            onClick = onClickViewUpdates,
                         )
                     }
+                }
+            }
+            items(state.feed.items, key = { "feed-${it.rId.ifBlank { it.articleLink }}" }) { item ->
+                FeaturedArticleCard(
+                    item = item,
+                    fullCoverOverlay = state.source.capabilities.todayFullCoverOverlay,
+                    modifier = Modifier.animateItem(),
+                ) {
+                    openArticle(item, onClickArticle)
+                }
+            }
+            if (state.feedLoading || state.feedLoadingMore) {
+                item(
+                    key = "feed-loading",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    LoadingBox(Modifier.fillMaxWidth())
+                }
+            }
+            if (state.feedError.isNotBlank()) {
+                item(
+                    key = "feed-error",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    Text(
+                        text = state.feedError,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(onClick = viewModel::retryFeed)
+                            .padding(16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
                 }
             }
         }
@@ -256,6 +245,7 @@ private fun openArticle(item: TodayFeaturedItem, onClickArticle: (TodayArticle) 
     )
 }
 
+/** 待更新提示卡：primaryContainer 色块 + 图标流 + 「查看」按钮。 */
 @Composable
 private fun PendingUpdatesCard(
     updates: List<MarketAppInfo>,
@@ -270,39 +260,36 @@ private fun PendingUpdatesCard(
         val fitsOneRow = updates.size <= rowCapacity
         val singleRowLayout = updates.size <= rowCapacity * 2
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = PaperCardRadius,
-            insideMargin = PaddingValues(0.dp),
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(TodayCardRadius))
+                .background(MaterialTheme.colorScheme.primaryContainer),
         ) {
             Column(Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(end = 8.dp)
-                        .padding(16.dp),
+                        .padding(start = 20.dp, top = 18.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = stringResource(Res.string.num_updates_pending, updates.size),
-                        color = MiuixTheme.colorScheme.onSurfaceContainer,
-                        style = MiuixTheme.textStyles.title3.copy(lineHeight = 24.sp),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                     AppButton(
                         text = stringResource(Res.string.view),
                         onClick = onClick,
-                        cornerRadius = 100.dp,
-                        minHeight = 34.dp,
-                        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        minHeight = 38.dp,
+                        insideMargin = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
                     )
                 }
-                Spacer(Modifier.height(1.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(vertical = 16.dp),
                 ) {
                     when {
                         fitsOneRow -> StaticIconRow(updates)
@@ -330,7 +317,7 @@ private fun StaticIconRow(
         modifier = modifier
             .fillMaxWidth()
             .height(rowHeight)
-            .padding(start = 16.dp - (itemWidth - iconSize) / 2),
+            .padding(start = 20.dp - (itemWidth - iconSize) / 2),
         horizontalArrangement = Arrangement.Start,
     ) {
         apps.forEach { app ->
@@ -382,7 +369,7 @@ internal fun ScrollingIconRow(
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
                 animation = tween(
-                    durationMillis = (loopApps.size * 2500).coerceAtLeast(12_000), // 调整速度
+                    durationMillis = (loopApps.size * 2500).coerceAtLeast(12_000),
                     easing = LinearEasing,
                 ),
             ),
@@ -408,7 +395,7 @@ internal fun ScrollingIconRow(
                 loopApps.forEachIndexed { index, app ->
                     Box(
                         modifier = Modifier.size(width = itemWidth, height = rowHeight),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         AppIcon(
                             url = app.icon,
@@ -472,7 +459,7 @@ private fun FeaturedArticleCard(
     fullCoverOverlay: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val fallbackColor = MiuixTheme.colorScheme.primary
+    val fallbackColor = MaterialTheme.colorScheme.primary
     var gradientColor by remember(item.coverImage, fallbackColor) { mutableStateOf(fallbackColor) }
     var coverRatio by remember(item.coverImage) { mutableStateOf<Float?>(null) }
     val app = item.app ?: item.apps.singleOrNull()
@@ -487,17 +474,14 @@ private fun FeaturedArticleCard(
             }
         )
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        cornerRadius = PaperCardRadius,
-        insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(
-            color = gradientColor,
-            contentColor = MiuixTheme.colorScheme.onPrimary,
-        ),
-        onClick = onClick,
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(TodayCardRadius))
+            .background(gradientColor)
+            .clickable(onClick = onClick),
     ) {
-        // 小米今日整卡覆盖：两行文案与应用行都叠加在封面上；其余来源保持两行文案覆盖 + 应用行附加
+        // 小米今日整卡覆盖：两行文案与应用行都叠加在封面上；其余来源保持两行文案覆盖 + 应用行附加。
         if (fullCoverOverlay && hasCover) {
             Box(coverSizeModifier) {
                 FeaturedCoverImage(
@@ -510,10 +494,14 @@ private fun FeaturedArticleCard(
                     CoverScrim(gradientColor)
                     Column(Modifier.fillMaxWidth().align(Alignment.BottomStart)) {
                         EditorialFeatureContent(item)
-                        if (app != null) AppFeatureContent(app)
+                        if (app != null) AppFeatureContent(app, appBarColor = Color.Transparent)
                     }
                 } else if (app != null) {
-                    AppFeatureContent(app, appBarColor = gradientColor)
+                    AppFeatureContent(
+                        app = app,
+                        appBarColor = Color.Transparent,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
         } else {
@@ -535,7 +523,7 @@ private fun FeaturedArticleCard(
                 if (app != null) {
                     AppFeatureContent(
                         app = app,
-                        appBarColor = gradientColor.takeUnless { hasCover && item.showCoverText },
+                        appBarColor = if (hasCover && item.showCoverText) null else gradientColor,
                     )
                 } else if (item.showCoverText) {
                     EditorialFeatureContent(item)
@@ -566,7 +554,7 @@ private fun FeaturedCoverImage(
         },
         showLoadingIndicator = true,
         loadingIndicatorAlignment = BiasAlignment(0f, -0.25f),
-        loadingIndicatorColor = MiuixTheme.colorScheme.onPrimary,
+        loadingIndicatorColor = Color.White,
     )
 }
 
@@ -596,7 +584,7 @@ private fun EditorialFeatureContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(20.dp),
     ) {
         if (item.showTitleLabel) {
             FeatureLabel(todayAwardLabel(label, item.title, appName))
@@ -605,33 +593,30 @@ private fun EditorialFeatureContent(
     }
 }
 
-
 @Composable
 private fun AppFeatureContent(
     app: MarketAppInfo,
     appBarColor: Color? = null,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .background(appBarColor ?: MiuixTheme.colorScheme.onBackground.copy(alpha = 0.10f))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .background(appBarColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(
             url = app.icon,
             contentDescription = appDisplayName(app.displayName, app.source),
-            size = 48.dp,
+            size = 52.dp,
         )
         Column(Modifier.weight(1f)) {
             Text(
                 text = appDisplayName(app.displayName, app.source),
-                color = MiuixTheme.colorScheme.onPrimary,
-                style = MiuixTheme.textStyles.headline1.copy(
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 22.sp,
-                ),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -644,13 +629,10 @@ private fun AppFeatureContent(
 private fun FeatureLabel(text: String) {
     Text(
         text = text,
-        color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-        style = MiuixTheme.textStyles.body2.copy(lineHeight = 16.sp),
+        color = Color.White.copy(alpha = 0.75f),
+        style = MaterialTheme.typography.labelMedium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.graphicsLayer {
-            blendMode = BlendMode.Plus
-        }
     )
 }
 
@@ -658,9 +640,9 @@ private fun FeatureLabel(text: String) {
 private fun FeatureTitle(text: String) {
     Text(
         text = text,
-        color = MiuixTheme.colorScheme.onPrimary,
-        style = MiuixTheme.textStyles.title3.copy(lineHeight = 24.sp),
-        maxLines = 1,
+        color = Color.White,
+        style = MaterialTheme.typography.headlineSmall,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
 }
@@ -669,12 +651,9 @@ private fun FeatureTitle(text: String) {
 private fun FeatureSummary(text: String) {
     Text(
         text = text,
-        color = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
-        style = MiuixTheme.textStyles.body2.copy(lineHeight = 18.sp),
+        color = Color.White.copy(alpha = 0.7f),
+        style = MaterialTheme.typography.bodySmall,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.graphicsLayer {
-            blendMode = BlendMode.Plus
-        }
     )
 }

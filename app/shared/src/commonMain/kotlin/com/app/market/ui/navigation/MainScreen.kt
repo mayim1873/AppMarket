@@ -8,21 +8,23 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -35,36 +37,28 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.app.market.domain.model.market.MarketAppInfo
 import com.app.market.domain.model.preference.HomePage
-import com.app.market.domain.repository.ThemePreferencesRepository
 import com.app.market.platform.UiPlatform
 import com.app.market.resources.Res
 import com.app.market.resources.nav_search
 import com.app.market.resources.nav_settings
 import com.app.market.resources.nav_today
 import com.app.market.resources.nav_updates
-import com.app.market.ui.component.FloatingBottomBar
-import com.app.market.ui.component.FloatingBottomBarItem
-import com.app.market.ui.component.blur.BlurredBar
-import com.app.market.ui.component.blur.rememberBlurBackdrop
+import com.app.market.ui.component.MarketNavItem
+import com.app.market.ui.component.MarketNavigationBar
+import com.app.market.ui.component.MarketNavigationRail
 import com.app.market.ui.screen.SearchTab
 import com.app.market.ui.screen.SettingsTab
 import com.app.market.ui.screen.TodayTab
 import com.app.market.ui.screen.UpdatesTab
-import com.app.market.ui.theme.LocalEnableFloatingBottomBar
-import com.app.market.ui.theme.LocalEnableFloatingBottomBarBlur
-import com.app.market.ui.theme.LocalEnableNavigationBadge
 import com.app.market.ui.util.rememberIsWideScreen
 import com.app.market.viewmodel.InstallerSettingsViewModel
 import com.app.market.viewmodel.SearchViewModel
@@ -76,29 +70,13 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import top.yukonga.miuix.kmp.basic.Badge
-import top.yukonga.miuix.kmp.basic.BadgedBox
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
-import top.yukonga.miuix.kmp.basic.NavigationRail
-import top.yukonga.miuix.kmp.basic.NavigationRailItem
-import top.yukonga.miuix.kmp.basic.NavigationRailValue
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.rememberNavigationRailState
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Create
-import top.yukonga.miuix.kmp.icon.extended.Search
-import top.yukonga.miuix.kmp.icon.extended.Settings
-import top.yukonga.miuix.kmp.icon.extended.Update
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 
 // 主页签集合按平台能力裁剪：桌面端（无法扫描已装应用 / 安装）不含「更新」。
 private enum class MainTab { Today, Updates, Search, Settings }
+
+/** 悬浮导航栏占用的垂直空间，用于给页面列表预留底部内边距。 */
+private val NavigationBarHeight = 84.dp
 
 @Composable
 fun MainPage(
@@ -111,10 +89,6 @@ fun MainPage(
     onPendingSearchConsumed: () -> Unit = {},
 ) {
     val uiPlatform = koinInject<UiPlatform>()
-    val themePreferences = koinInject<ThemePreferencesRepository>()
-    val preferencesInitialized by themePreferences.initialized.collectAsStateWithLifecycle()
-    val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
-    val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
     val updatesState by updatesViewModel.uiState.collectAsStateWithLifecycle()
     val appManagementSupported = uiPlatform.packageInstallationSupported
     val tabs = remember(appManagementSupported) {
@@ -129,7 +103,7 @@ fun MainPage(
     fun homeIndexOf(page: HomePage): Int =
         tabs.indexOf(page.toTab()).takeIf { it >= 0 } ?: 0
 
-    // Initial page reads the seeded value once (no launch jump); reactive for the Back target.
+    // 初始页读取一次种子值（不跳转）；后续随返回目标响应式变化。
     val homePage by updatesViewModel.homePage.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(
         initialPage = homeIndexOf(updatesViewModel.homePage.value),
@@ -164,13 +138,12 @@ fun MainPage(
         onPendingSearchConsumed()
     }
 
-    // Keep selectedPage (nav-bar highlight + per-tab gating) in sync when the user swipes the pager,
-    // not just when a tab is tapped (animateToPage).
+    // 用户滑动 pager 时也同步选中页（而不只是点击 tab 的 animateToPage）。
     LaunchedEffect(mainPagerState.pagerState.currentPage) {
         mainPagerState.syncPage()
     }
 
-    // Update checking (and its permission dance) only applies where app management is supported.
+    // 更新检查（含权限流程）只在支持应用管理的平台执行。
     LaunchedEffect(Unit) {
         if (appManagementSupported && !notificationPermissionRequested) {
             notificationPermissionRequested = true
@@ -184,16 +157,18 @@ fun MainPage(
     MainScreenBackHandler(mainPagerState, navigator, homeIndexOf(homePage))
 
     val openDetail: (MarketAppInfo) -> Unit = { app ->
-        // 搜索页可能给出 vivo 条目，详情要打对应源的接口
+        // 搜索页可能给出 vivo 条目，详情要打对应源的接口。
         navigator.push(Route.AppDetail(app.appId, app.packageName, app.displayName, source = app.source))
     }
 
+    val navigationBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pagerContent: @Composable (Modifier, Dp) -> Unit = { pagerModifier, bottomPadding ->
         HorizontalPager(
             modifier = pagerModifier,
             state = mainPagerState.pagerState,
             overscrollEffect = null,
             verticalAlignment = Alignment.Top,
+            beyondViewportPageCount = 1,
         ) { page ->
             when (tabs[page]) {
                 MainTab.Today -> TodayTab(
@@ -239,144 +214,54 @@ fun MainPage(
         }
     }
 
+    val navItems = tabs.map { tab ->
+        MarketNavItem(
+            icon = tab.icon,
+            label = stringResource(tab.labelRes),
+            badgeCount = navigationBadgeCount(tab, updatesState.updates.size),
+        )
+    }
+
     if (isWideScreen) {
-        Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
-            Row(Modifier.fillMaxSize()) {
-                if (preferencesInitialized) {
-                    val railState = rememberNavigationRailState(
-                        initialValue = if (themePreferences.navRailExpanded.value) {
-                            NavigationRailValue.Expanded
-                        } else {
-                            NavigationRailValue.Collapsed
-                        },
+        Row(Modifier.fillMaxSize()) {
+            MarketNavigationRail(
+                items = navItems,
+                selectedIndex = selectedPage,
+                onSelected = { index -> onTabClick(index, tabs[index]) },
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars)),
+            )
+            pagerContent(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    // 侧栏已消费起始侧的刘海 / 导航栏内边距，末端侧在此补上。
+                    .consumeWindowInsets(
+                        WindowInsets.displayCutout.union(WindowInsets.navigationBars)
+                            .only(WindowInsetsSides.Start),
                     )
-                    LaunchedEffect(railState.currentValue) {
-                        themePreferences.setNavRailExpanded(railState.isExpanded)
-                    }
-                    NavigationRail(state = railState) {
-                        tabs.forEachIndexed { index, tab ->
-                            NavigationRailItem(
-                                selected = selectedPage == index,
-                                onClick = { onTabClick(index, tab) },
-                                icon = tab.icon,
-                                label = stringResource(tab.labelRes),
-                            )
-                        }
-                    }
-                }
-                pagerContent(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        // The rail already absorbed the start-side cutout/nav-bar insets; the end
-                        // side has no rail, so pad it here (and mark it consumed for descendants).
-                        .consumeWindowInsets(
-                            WindowInsets.displayCutout.union(WindowInsets.navigationBars)
-                                .only(WindowInsetsSides.Start),
-                        )
-                        .windowInsetsPadding(
-                            WindowInsets.systemBars.union(WindowInsets.displayCutout)
-                                .only(WindowInsetsSides.End),
-                        ),
-                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-                )
-            }
+                    .windowInsetsPadding(
+                        WindowInsets.systemBars.union(WindowInsets.displayCutout)
+                            .only(WindowInsetsSides.End),
+                    ),
+                navigationBottomInset,
+            )
         }
     } else {
-        val blurBackdrop = rememberBlurBackdrop()
-        val blurActive = blurBackdrop != null
-        val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
-        val surfaceColor = MiuixTheme.colorScheme.surface
-        val glassBackdrop = rememberLayerBackdrop {
-            drawRect(surfaceColor)
-            drawContent()
-        }
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            bottomBar = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                    if (!enableFloatingBottomBar) {
-                        BlurredBar(backdrop = blurBackdrop, blurActive = blurActive) {
-                            NavigationBar(color = barColor) {
-                                tabs.forEachIndexed { index, tab ->
-                                    NavigationBarItem(
-                                        modifier = Modifier.weight(1f),
-                                        selected = selectedPage == index,
-                                        onClick = { onTabClick(index, tab) },
-                                        icon = tab.icon,
-                                        label = stringResource(tab.labelRes),
-                                        badge = navigationBadge(tab, updatesState.updates.size),
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        FloatingBottomBar(
-                            modifier = Modifier
-                                .padding(
-                                    bottom = 12.dp + WindowInsets.navigationBars.asPaddingValues()
-                                        .calculateBottomPadding(),
-                                ),
-                            selectedIndex = mainPagerState.selectedPage,
-                            onSelected = { index -> onTabClick(index, tabs[index]) },
-                            backdrop = glassBackdrop,
-                            tabsCount = tabs.size,
-                            isBlurEnabled = enableFloatingBottomBarBlur,
-                        ) {
-                            tabs.forEachIndexed { index, tab ->
-                                val label = stringResource(tab.labelRes)
-                                FloatingBottomBarItem(
-                                    modifier = Modifier.defaultMinSize(minWidth = 76.dp),
-                                    selected = mainPagerState.selectedPage == index,
-                                    onClick = { onTabClick(index, tab) },
-                                ) {
-                                    val badge = navigationBadge(tab, updatesState.updates.size)
-                                    val icon: @Composable () -> Unit = {
-                                        Icon(
-                                            modifier = Modifier.size(22.dp),
-                                            imageVector = tab.icon,
-                                            contentDescription = null,
-                                        )
-                                    }
-                                    if (badge != null) {
-                                        BadgedBox(badge = { badge() }) { icon() }
-                                    } else {
-                                        icon()
-                                    }
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        ) { padding ->
-            Box(
+        Box(Modifier.fillMaxSize()) {
+            pagerContent(
+                Modifier.fillMaxSize(),
+                NavigationBarHeight + navigationBottomInset + 8.dp,
+            )
+            MarketNavigationBar(
+                items = navItems,
+                selectedIndex = selectedPage,
+                onSelected = { index -> onTabClick(index, tabs[index]) },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop) else Modifier),
-            ) {
-                pagerContent(
-                    Modifier
-                        .fillMaxSize()
-                        .then(
-                            if (enableFloatingBottomBar && enableFloatingBottomBarBlur) {
-                                Modifier.layerBackdrop(glassBackdrop)
-                            } else {
-                                Modifier
-                            },
-                        ),
-                    padding.calculateBottomPadding(),
-                )
-            }
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+            )
         }
     }
 }
@@ -387,12 +272,12 @@ private fun HomePage.toTab(): MainTab = when (this) {
     HomePage.SEARCH -> MainTab.Search
 }
 
-private val MainTab.icon
+private val MainTab.icon: ImageVector
     get() = when (this) {
-        MainTab.Today -> MiuixIcons.Create
-        MainTab.Updates -> MiuixIcons.Update
-        MainTab.Search -> MiuixIcons.Search
-        MainTab.Settings -> MiuixIcons.Settings
+        MainTab.Today -> Icons.Filled.Explore
+        MainTab.Updates -> Icons.Filled.Update
+        MainTab.Search -> Icons.Filled.Search
+        MainTab.Settings -> Icons.Filled.Settings
     }
 
 private val MainTab.labelRes
@@ -403,18 +288,8 @@ private val MainTab.labelRes
         MainTab.Settings -> Res.string.nav_settings
     }
 
-@Composable
-private fun navigationBadge(
-    tab: MainTab,
-    updateCount: Int,
-): (@Composable () -> Unit)? {
-    if (!LocalEnableNavigationBadge.current || tab != MainTab.Updates || updateCount <= 0) return null
-    return {
-        Badge {
-            Text(updateCount.toString())
-        }
-    }
-}
+private fun navigationBadgeCount(tab: MainTab, updateCount: Int): Int =
+    if (tab == MainTab.Updates && updateCount > 0) updateCount else 0
 
 @Stable
 class MainPagerState(
@@ -447,10 +322,11 @@ class MainPagerState(
         }
     }
 
-    /** Sync [selectedPage] to the pager after a manual swipe (when not animating a tab tap). */
+    /** 手动滑动后同步 [selectedPage]（tab 点击动画期间不干预）。 */
     fun syncPage() {
-        if (!isNavigating && selectedPage != pagerState.currentPage) selectedPage =
-            pagerState.currentPage
+        if (!isNavigating && selectedPage != pagerState.currentPage) {
+            selectedPage = pagerState.currentPage
+        }
     }
 }
 
@@ -526,8 +402,3 @@ private fun MainScreenBackHandler(
         onBackCompleted = { mainState.animateToPage(homeIndex) },
     )
 }
-
-
-
-
-

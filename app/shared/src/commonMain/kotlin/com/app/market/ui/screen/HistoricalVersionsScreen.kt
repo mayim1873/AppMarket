@@ -1,18 +1,22 @@
 package com.app.market.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,8 +24,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,7 +47,10 @@ import com.app.market.ui.component.AppCompactButton
 import com.app.market.ui.component.AppTextButton
 import com.app.market.ui.component.CardSegmentContainer
 import com.app.market.ui.component.LoadingBox
+import com.app.market.ui.component.MarketCard
+import com.app.market.ui.component.MarketDivider
 import com.app.market.ui.component.MarketScaffold
+import com.app.market.ui.component.PageHorizontalPadding
 import com.app.market.ui.component.PageVerticalPadding
 import com.app.market.ui.util.formatSize
 import com.app.market.ui.util.localDateOf
@@ -53,10 +58,6 @@ import com.app.market.viewmodel.HistoricalVersionsViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun HistoricalVersionsScreen(
@@ -86,19 +87,15 @@ fun HistoricalVersionsScreen(
     MarketScaffold(
         title = stringResource(Res.string.historical_versions_title, displayName),
         onBack = onBack,
-    ) { innerPadding, backdropModifier, scrollBehavior ->
-        val layoutDirection = LocalLayoutDirection.current
+    ) { innerPadding, _, scrollBehavior ->
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .then(backdropModifier)
-                .scrollEndHaptic()
-                .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
-                start = innerPadding.calculateStartPadding(layoutDirection),
-                end = innerPadding.calculateEndPadding(layoutDirection),
+                start = PageHorizontalPadding,
+                end = PageHorizontalPadding,
                 top = innerPadding.calculateTopPadding() + PageVerticalPadding,
                 bottom = innerPadding.calculateBottomPadding() + PageVerticalPadding,
             ),
@@ -107,11 +104,24 @@ fun HistoricalVersionsScreen(
                 item(key = "loading") { LoadingBox(Modifier.fillParentMaxSize()) }
             } else if (state.items.isEmpty() && state.errorMessage.isBlank()) {
                 item(key = "empty") {
-                    Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        modifier = Modifier
+                            .fillParentMaxSize()
+                            .padding(horizontal = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.History,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                         Text(
                             text = stringResource(Res.string.no_historical_versions),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            style = MiuixTheme.textStyles.main,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -119,21 +129,37 @@ fun HistoricalVersionsScreen(
 
             if (state.errorMessage.isNotBlank()) {
                 item(key = "error-${state.errorMessage}") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    MarketCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = if (state.items.isEmpty()) 0.dp else PageVerticalPadding),
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
                     ) {
-                        Text(
-                            text = state.errorMessage,
-                            color = MiuixTheme.colorScheme.onErrorContainer,
-                            style = MiuixTheme.textStyles.main,
-                            textAlign = TextAlign.Center,
-                        )
-                        AppTextButton(
-                            text = stringResource(Res.string.retry),
-                            onClick = { viewModel.retry(appId, packageName) },
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = state.errorMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                AppTextButton(
+                                    text = stringResource(Res.string.retry),
+                                    onClick = { viewModel.retry(appId, packageName) },
+                                    modifier = Modifier.align(Alignment.Start),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -148,6 +174,7 @@ fun HistoricalVersionsScreen(
                 CardSegmentContainer(
                     isFirst = index == 0,
                     isLast = index == state.items.lastIndex,
+                    horizontalPadding = 0.dp,
                 ) {
                     HistoricalVersionRow(
                         version = version,
@@ -155,6 +182,9 @@ fun HistoricalVersionsScreen(
                         onDownload = { viewModel.download(version) },
                         onPause = { viewModel.pause(version) },
                     )
+                    if (index != state.items.lastIndex) {
+                        MarketDivider()
+                    }
                 }
             }
 
@@ -181,23 +211,22 @@ private fun HistoricalVersionRow(
     }
     val summary = listOf(formatSize(version.size), dateText).filter(String::isNotBlank).joinToString(" · ")
     Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = version.versionName,
-                color = MiuixTheme.colorScheme.onSurface,
-                style = MiuixTheme.textStyles.headline1,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = summary,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                style = MiuixTheme.textStyles.body2,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

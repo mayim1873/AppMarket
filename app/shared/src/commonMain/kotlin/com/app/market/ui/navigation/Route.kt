@@ -2,10 +2,9 @@ package com.app.market.ui.navigation
 
 import com.app.market.domain.model.market.AppSource
 import kotlinx.serialization.Serializable
-import top.yukonga.miuix.kmp.nav.core.NavKey
 
 @Serializable
-sealed interface Route : NavKey {
+sealed interface Route {
     @Serializable
     data object Main : Route
 

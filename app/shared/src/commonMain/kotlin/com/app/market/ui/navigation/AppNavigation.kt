@@ -1,15 +1,24 @@
 package com.app.market.ui.navigation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import com.app.market.domain.model.market.AppSource
 import com.app.market.domain.model.update.IgnoredUpdate
 import com.app.market.ui.screen.AboutScreen
@@ -38,12 +47,11 @@ import com.app.market.viewmodel.TodayViewModel
 import com.app.market.viewmodel.UpdateHistoryViewModel
 import com.app.market.viewmodel.UpdatesViewModel
 import org.koin.compose.viewmodel.koinViewModel
-import top.yukonga.miuix.kmp.nav.core.NavDisplay
-import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
-import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
-import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
-import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 
+/**
+ * 应用导航宿主：采用 Compose [AnimatedContent] 实现 M3E 的共享轴横向转场，
+ * 并用 [rememberSaveableStateHolder] 保留每个路由的滚动位置等可保存状态。
+ */
 @Composable
 fun AppNavigation(
     externalDetailPackageName: String? = null,
@@ -54,19 +62,13 @@ fun AppNavigation(
     externalOpenDownloads: Boolean = false,
     onExternalDownloadsConsumed: () -> Unit = {},
 ) {
-    val backStack = rememberNavBackStack<Route>(Route.Main)
-    val navigator = remember { Navigator(backStack) }
+    val navigator = rememberNavigator()
     var pendingSearchKeyword by remember { mutableStateOf<String?>(null) }
 
     val updatesViewModel = koinViewModel<UpdatesViewModel>()
     val searchViewModel = koinViewModel<SearchViewModel>()
     val installerSettingsViewModel = koinViewModel<InstallerSettingsViewModel>()
     val todayViewModel = koinViewModel<TodayViewModel>()
-    val swipeBackDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
-        NavSwipeDirection.RightToLeft
-    } else {
-        NavSwipeDirection.LeftToRight
-    }
 
     LaunchedEffect(externalDetailPackageName, externalDetailQuery) {
         val packageName =
@@ -84,7 +86,7 @@ fun AppNavigation(
         onExternalDetailConsumed(packageName)
     }
 
-    // 外部搜索链接：先回主页面，再交由主页面切页执行
+    // 外部搜索链接：先回主页面，再交由主页面切页执行。
     LaunchedEffect(externalSearchKeyword) {
         val keyword = externalSearchKeyword ?: return@LaunchedEffect
         navigator.popUntil { it is Route.Main }
@@ -100,171 +102,206 @@ fun AppNavigation(
         onExternalDownloadsConsumed()
     }
 
+    val backHandlerState = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = backHandlerState,
+        isBackEnabled = navigator.backStackSize() > 1,
+        onBackCompleted = { navigator.pop() },
+    )
+
     CompositionLocalProvider(LocalNavigator provides navigator) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = { navigator.pop() },
-            effects = NavDisplayEffects(
-                enableCornerClip = true,
-                cornerClipRadius = rememberNavSystemCornerRadius(),
-                dimAmount = 0.5f,
-            ),
-        ) {
-            entry<Route.Main> {
-                MainPage(
-                    navigator = navigator,
-                    updatesViewModel = updatesViewModel,
-                    searchViewModel = searchViewModel,
-                    installerSettingsViewModel = installerSettingsViewModel,
-                    todayViewModel = todayViewModel,
-                    pendingSearchKeyword = pendingSearchKeyword,
-                    onPendingSearchConsumed = { pendingSearchKeyword = null },
-                )
-            }
-            entry<Route.AppDetail>(swipeDismiss = swipeBackDirection) { route ->
-                val vm = koinViewModel<AppDetailViewModel>()
-                AppDetailScreen(
-                    viewModel = vm,
-                    appId = route.appId,
-                    packageName = route.packageName,
-                    externalQuery = route.externalQuery,
-                    source = route.source,
-                    onOpenDetail = {
-                        navigator.push(
-                            Route.AppDetail(
-                                it.appId,
-                                it.packageName,
-                                it.displayName,
-                                source = it.source,
-                            )
+        val currentRoute = navigator.backStack.lastOrNull() ?: Route.Main
+        val stateHolder = rememberSaveableStateHolder()
+        AnimatedContent(
+            targetState = currentRoute,
+            transitionSpec = {
+                val isPush = targetState != Route.Main
+                if (isPush) {
+                    (slideInHorizontally(animationSpec = tween(320)) { it / 6 } +
+                            fadeIn(animationSpec = tween(220))) togetherWith
+                            (slideOutHorizontally(animationSpec = tween(320)) { -it / 12 } +
+                                    fadeOut(animationSpec = tween(180)))
+                } else {
+                    (slideInHorizontally(animationSpec = tween(320)) { -it / 12 } +
+                            fadeIn(animationSpec = tween(220))) togetherWith
+                            (slideOutHorizontally(animationSpec = tween(320)) { it / 6 } +
+                                    fadeOut(animationSpec = tween(180)))
+                }
+            },
+            label = "AppNavigation",
+        ) { route ->
+            // 用可序列化的字符串作为状态 key，保证配置变更后滚动位置等状态可恢复。
+            stateHolder.SaveableStateProvider(route.toString()) {
+                when (route) {
+                    Route.Main -> MainPage(
+                        navigator = navigator,
+                        updatesViewModel = updatesViewModel,
+                        searchViewModel = searchViewModel,
+                        installerSettingsViewModel = installerSettingsViewModel,
+                        todayViewModel = todayViewModel,
+                        pendingSearchKeyword = pendingSearchKeyword,
+                        onPendingSearchConsumed = { pendingSearchKeyword = null },
+                    )
+
+                    is Route.AppDetail -> {
+                        val vm = koinViewModel<AppDetailViewModel>()
+                        AppDetailScreen(
+                            viewModel = vm,
+                            appId = route.appId,
+                            packageName = route.packageName,
+                            externalQuery = route.externalQuery,
+                            source = route.source,
+                            onOpenDetail = {
+                                navigator.push(
+                                    Route.AppDetail(
+                                        it.appId,
+                                        it.packageName,
+                                        it.displayName,
+                                        source = it.source,
+                                    )
+                                )
+                            },
+                            onOpenHistory = { app ->
+                                navigator.push(
+                                    Route.HistoricalVersions(
+                                        appId = app.appId,
+                                        packageName = app.packageName,
+                                        displayName = app.displayName,
+                                    )
+                                )
+                            },
+                            onBack = { navigator.pop() },
                         )
-                    },
-                    onOpenHistory = { app ->
-                        navigator.push(
-                            Route.HistoricalVersions(
-                                appId = app.appId,
-                                packageName = app.packageName,
-                                displayName = app.displayName,
-                            )
+                    }
+
+                    is Route.HistoricalVersions -> {
+                        val vm = koinViewModel<HistoricalVersionsViewModel>()
+                        HistoricalVersionsScreen(
+                            viewModel = vm,
+                            appId = route.appId,
+                            packageName = route.packageName,
+                            displayName = route.displayName,
+                            onBack = { navigator.pop() },
                         )
-                    },
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.HistoricalVersions>(swipeDismiss = swipeBackDirection) { route ->
-                val vm = koinViewModel<HistoricalVersionsViewModel>()
-                HistoricalVersionsScreen(
-                    viewModel = vm,
-                    appId = route.appId,
-                    packageName = route.packageName,
-                    displayName = route.displayName,
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.TodayArticle>(swipeDismiss = swipeBackDirection) { route ->
-                TodayArticleScreen(
-                    rId = route.rId,
-                    viewModel = todayViewModel,
-                    onOpenApp = {
-                        navigator.push(
-                            Route.AppDetail(
-                                it.appId,
-                                it.packageName,
-                                it.displayName,
-                                source = it.source,
+                    }
+
+                    is Route.TodayArticle -> TodayArticleScreen(
+                        rId = route.rId,
+                        viewModel = todayViewModel,
+                        onOpenApp = {
+                            navigator.push(
+                                Route.AppDetail(
+                                    it.appId,
+                                    it.packageName,
+                                    it.displayName,
+                                    source = it.source,
+                                )
                             )
+                        },
+                        onBack = { navigator.pop() },
+                    )
+
+                    Route.DeviceProfile -> {
+                        val vm = koinViewModel<DeviceProfileViewModel>()
+                        DeviceProfileScreen(vm, onBack = { navigator.pop() })
+                    }
+
+                    Route.IgnoredApps -> {
+                        val vm = koinViewModel<IgnoredAppsViewModel>()
+                        IgnoredAppsScreen(
+                            viewModel = vm,
+                            onOpenDetail = {
+                                val activeSource = updatesViewModel.updateSource.value
+                                navigator.push(ignoredDetailRoute(it, activeSource))
+                            },
+                            onBack = { navigator.pop() },
                         )
-                    },
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.DeviceProfile>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<DeviceProfileViewModel>()
-                DeviceProfileScreen(vm, onBack = { navigator.pop() })
-            }
-            entry<Route.IgnoredApps>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<IgnoredAppsViewModel>()
-                IgnoredAppsScreen(
-                    viewModel = vm,
-                    onOpenDetail = {
-                        val activeSource = updatesViewModel.updateSource.value
-                        navigator.push(ignoredDetailRoute(it, activeSource))
-                    },
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.ManualUpdate>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<ManualUpdateViewModel>()
-                ManualUpdateScreen(
-                    viewModel = vm,
-                    onOpenDetail = {
-                        navigator.push(
-                            Route.AppDetail(
-                                it.appId,
-                                it.packageName,
-                                it.displayName,
-                                source = it.source,
-                            )
+                    }
+
+                    Route.ManualUpdate -> {
+                        val vm = koinViewModel<ManualUpdateViewModel>()
+                        ManualUpdateScreen(
+                            viewModel = vm,
+                            onOpenDetail = {
+                                navigator.push(
+                                    Route.AppDetail(
+                                        it.appId,
+                                        it.packageName,
+                                        it.displayName,
+                                        source = it.source,
+                                    )
+                                )
+                            },
+                            onBack = { navigator.pop() },
                         )
-                    },
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.UpdateHistory>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<UpdateHistoryViewModel>()
-                UpdateHistoryScreen(
-                    viewModel = vm,
-                    onOpenDetail = {
-                        navigator.push(
-                            Route.AppDetail(
-                                it.appId,
-                                it.packageName,
-                                it.displayName,
-                                source = it.source
-                                    ?: updatesViewModel.updateSource.value,
-                            )
+                    }
+
+                    Route.UpdateHistory -> {
+                        val vm = koinViewModel<UpdateHistoryViewModel>()
+                        UpdateHistoryScreen(
+                            viewModel = vm,
+                            onOpenDetail = {
+                                navigator.push(
+                                    Route.AppDetail(
+                                        it.appId,
+                                        it.packageName,
+                                        it.displayName,
+                                        source = it.source
+                                            ?: updatesViewModel.updateSource.value,
+                                    )
+                                )
+                            },
+                            onBack = { navigator.pop() },
                         )
-                    },
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.SavedPackages>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<SavedPackagesViewModel>()
-                SavedPackagesScreen(
-                    viewModel = vm,
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.DownloadingApps>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<DownloadingAppsViewModel>()
-                DownloadingAppsScreen(
-                    viewModel = vm,
-                    onOpenDetail = {
-                        val source = it.source
-                            ?: updatesViewModel.searchSources.value.firstOrNull()
-                            ?: AppSource.Default.first()
-                        navigator.push(
-                            Route.AppDetail(
-                                it.appId,
-                                it.packageName,
-                                it.displayName,
-                                source = source,
-                            )
+                    }
+
+                    Route.SavedPackages -> {
+                        val vm = koinViewModel<SavedPackagesViewModel>()
+                        SavedPackagesScreen(
+                            viewModel = vm,
+                            onBack = { navigator.pop() },
                         )
-                    },
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.InstallerSettings>(swipeDismiss = swipeBackDirection) {
-                InstallerSettingsScreen(installerSettingsViewModel, onBack = { navigator.pop() })
-            }
-            entry<Route.About>(swipeDismiss = swipeBackDirection) {
-                val uriHandler = LocalUriHandler.current
-                AboutScreen(onBack = { navigator.pop() }, onOpenUrl = { uriHandler.openUri(it) })
-            }
-            entry<Route.ThemeSettings>(swipeDismiss = swipeBackDirection) {
-                val vm = koinViewModel<ThemeSettingsViewModel>()
-                ThemeSettingsScreen(vm, onBack = { navigator.pop() })
+                    }
+
+                    Route.DownloadingApps -> {
+                        val vm = koinViewModel<DownloadingAppsViewModel>()
+                        DownloadingAppsScreen(
+                            viewModel = vm,
+                            onOpenDetail = {
+                                val source = it.source
+                                    ?: updatesViewModel.searchSources.value.firstOrNull()
+                                    ?: AppSource.Default.first()
+                                navigator.push(
+                                    Route.AppDetail(
+                                        it.appId,
+                                        it.packageName,
+                                        it.displayName,
+                                        source = source,
+                                    )
+                                )
+                            },
+                            onBack = { navigator.pop() },
+                        )
+                    }
+
+                    Route.InstallerSettings -> InstallerSettingsScreen(
+                        installerSettingsViewModel,
+                        onBack = { navigator.pop() },
+                    )
+
+                    Route.About -> {
+                        val uriHandler = LocalUriHandler.current
+                        AboutScreen(
+                            onBack = { navigator.pop() },
+                            onOpenUrl = { uriHandler.openUri(it) },
+                        )
+                    }
+
+                    Route.ThemeSettings -> {
+                        val vm = koinViewModel<ThemeSettingsViewModel>()
+                        ThemeSettingsScreen(vm, onBack = { navigator.pop() })
+                    }
+                }
             }
         }
     }

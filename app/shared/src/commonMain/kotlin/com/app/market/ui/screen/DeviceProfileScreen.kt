@@ -1,21 +1,30 @@
 package com.app.market.ui.screen
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.market.domain.model.market.AppSource
@@ -57,29 +67,23 @@ import com.app.market.resources.profile_template_name
 import com.app.market.resources.save
 import com.app.market.resources.saved
 import com.app.market.ui.component.AppButton
+import com.app.market.ui.component.AppButtonDefaults
 import com.app.market.ui.component.AppTextButton
 import com.app.market.ui.component.LoadingBox
+import com.app.market.ui.component.MarketConfirmDialog
+import com.app.market.ui.component.MarketDialog
+import com.app.market.ui.component.MarketDivider
 import com.app.market.ui.component.MarketScaffold
 import com.app.market.ui.component.PageVerticalPadding
-import com.app.market.ui.component.deferredTopPadding
+import com.app.market.ui.component.SettingsDropdownRow
+import com.app.market.ui.component.SettingsGroup
 import com.app.market.ui.util.appSourceLabel
 import com.app.market.viewmodel.DeviceProfileViewModel
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.TabRow
-import top.yukonga.miuix.kmp.basic.TabRowDefaults
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
 
+/** 底部标签栏距屏幕底部的呼吸距离。 */
 private val TabRowBottomPadding = 6.dp
 
 @Composable
@@ -139,33 +143,47 @@ fun DeviceProfileScreen(
     MarketScaffold(
         title = stringResource(Res.string.device_profile),
         onBack = onBack,
-        bottomContent = { scrollBehavior ->
-            // Top bar expanded: extra breathing room above the tabs; collapsed: flush with the bar.
-            val dynamicTopPadding = remember(scrollBehavior) {
-                { PageVerticalPadding * (1f - scrollBehavior.state.collapsedFraction) }
-            }
+        bottomContent = {
+            // 标签栏固定在底部，内容区由脚手架 innerPadding 自行避让
             Column(
                 modifier = Modifier
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = TabRowBottomPadding)
-                    .deferredTopPadding(dynamicTopPadding),
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = TabRowBottomPadding),
             ) {
+                MarketDivider(startPadding = 0.dp, endPadding = 0.dp)
                 TabRow(
-                    tabs = tabs,
                     selectedTabIndex = pagerState.currentPage,
-                    onTabSelected = { index ->
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(
-                                page = index,
-                                animationSpec = com.app.market.ui.navigation.PagerNavigationSpringSpec,
-                            )
-                        }
-                    },
-                    colors = TabRowDefaults.tabRowColors(backgroundColor = Color.Transparent),
-                    minWidth = 92.dp,
-                    maxWidth = 116.dp,
-                    height = 40.dp,
-                )
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    divider = {},
+                ) {
+                    tabs.forEachIndexed { index, label ->
+                        Tab(
+                            selected = pagerState.currentPage == index,
+                            onClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(
+                                        page = index,
+                                        animationSpec = com.app.market.ui.navigation.PagerNavigationSpringSpec,
+                                    )
+                                }
+                            },
+                            text = {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            selectedContentColor = MaterialTheme.colorScheme.primary,
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         },
     ) { innerPadding, backdropModifier, scrollBehavior ->
@@ -255,7 +273,7 @@ private fun DeviceProfileSourcePage(
     hasCustomRequestContext: Boolean,
     modifier: Modifier,
     innerPadding: PaddingValues,
-    scrollBehavior: ScrollBehavior,
+    scrollBehavior: TopAppBarScrollBehavior,
     onSave: () -> Unit,
     onSaveTemplate: () -> Unit,
     onRequestDeleteTemplate: () -> Unit,
@@ -265,19 +283,17 @@ private fun DeviceProfileSourcePage(
         modifier = Modifier
             .fillMaxSize()
             .then(modifier)
-            .scrollEndHaptic()
-            .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(
-            start = innerPadding.calculateStartPadding(layoutDirection) + 12.dp,
-            end = innerPadding.calculateEndPadding(layoutDirection) + 12.dp,
-            top = innerPadding.calculateTopPadding() + PageVerticalPadding - TabRowBottomPadding,
+            start = innerPadding.calculateStartPadding(layoutDirection),
+            end = innerPadding.calculateEndPadding(layoutDirection),
+            top = innerPadding.calculateTopPadding() + PageVerticalPadding,
             bottom = innerPadding.calculateBottomPadding() + PageVerticalPadding,
         ),
     ) {
         item(key = "source") {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SettingsGroup {
                 val templateNamesForSource = templates.map { it.name }
                 val sourceItems = buildList {
                     add(customLabel)
@@ -294,7 +310,7 @@ private fun DeviceProfileSourcePage(
                     source == ProfileSource.DEVICE && canUseDevice -> sourceItems.lastIndex
                     else -> 1
                 }
-                WindowDropdownPreference(
+                SettingsDropdownRow(
                     title = stringResource(Res.string.profile_source),
                     items = sourceItems,
                     selectedIndex = selectedIndex,
@@ -314,8 +330,8 @@ private fun DeviceProfileSourcePage(
         }
         if (appSource == OPPO) {
             item(key = "oppo-store-region") {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    WindowDropdownPreference(
+                SettingsGroup {
+                    SettingsDropdownRow(
                         title = stringResource(Res.string.profile_store_region),
                         items = listOf(chinaRegionLabel, globalRegionLabel),
                         selectedIndex = if (oppoStoreRegion == OppoStoreRegion.CHINA) 0 else 1,
@@ -328,19 +344,17 @@ private fun DeviceProfileSourcePage(
                 }
             }
             items(oppoRequestValues, key = { "oppo-header-${it.first}" }) { (name, value) ->
-                TextField(
+                ProfileField(
+                    name = name,
                     value = value,
                     onValueChange = { viewModel.updateOppoRequestContext(name, it) },
-                    label = name,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
         if (appSource == SAMSUNG) {
             item(key = "samsung-store-region") {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    WindowDropdownPreference(
+                SettingsGroup {
+                    SettingsDropdownRow(
                         title = stringResource(Res.string.profile_store_region),
                         items = listOf(chinaRegionLabel, globalRegionLabel),
                         selectedIndex = if (samsungStoreRegion == SamsungStoreRegion.CHINA) 0 else 1,
@@ -353,30 +367,31 @@ private fun DeviceProfileSourcePage(
                 }
             }
             items(samsungRequestValues, key = { "samsung-header-${it.first}" }) { (name, value) ->
-                TextField(
+                ProfileField(
+                    name = name,
                     value = value,
                     onValueChange = { viewModel.updateSamsungRequestContext(name, it) },
-                    label = name,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
         items(DeviceProfileViewModel.fieldsFor(appSource), key = { it }) { name ->
-            TextField(
+            ProfileField(
+                name = name,
                 value = DeviceProfileViewModel.valueOf(profile, name),
                 onValueChange = { viewModel.update(appSource, name, it) },
-                label = name,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
             )
         }
         item(key = "save") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 AppButton(
                     text = stringResource(Res.string.save),
                     onClick = onSave,
-                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    colors = AppButtonDefaults.filled(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 AppTextButton(
@@ -387,8 +402,8 @@ private fun DeviceProfileSourcePage(
                 if (selectedTemplate != null) {
                     AppTextButton(
                         text = stringResource(Res.string.delete),
-                        colors = ButtonDefaults.textButtonColors(
-                            textColor = MiuixTheme.colorScheme.error,
+                        colors = AppButtonDefaults.text().copy(
+                            contentColor = MaterialTheme.colorScheme.error,
                         ),
                         onClick = onRequestDeleteTemplate,
                         modifier = Modifier.fillMaxWidth(),
@@ -397,6 +412,25 @@ private fun DeviceProfileSourcePage(
             }
         }
     }
+}
+
+/** 单个请求头 / 资料字段：独立 lazy item，保持输入焦点与滚动性能。 */
+@Composable
+private fun ProfileField(
+    name: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(name) },
+        singleLine = true,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    )
 }
 
 @Composable
@@ -416,37 +450,31 @@ private fun SaveTemplateDialog(
     onSave: (String) -> Unit,
 ) {
     var name by remember(show, defaultName) { mutableStateOf(defaultName) }
-    WindowDialog(
+    MarketDialog(
         show = show,
         title = stringResource(Res.string.profile_save_template),
         onDismissRequest = onDismiss,
     ) {
-        Column(
-            modifier = Modifier.heightIn(max = 260.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            TextField(
-                value = name,
-                onValueChange = { name = it },
-                label = stringResource(Res.string.profile_template_name),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(stringResource(Res.string.profile_template_name)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            AppTextButton(
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
             )
-            Row(modifier = Modifier.fillMaxWidth()) {
-                AppTextButton(
-                    text = stringResource(Res.string.cancel),
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(12.dp))
-                AppTextButton(
-                    text = stringResource(Res.string.save),
-                    enabled = name.isNotBlank(),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    onClick = { onSave(name) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            Spacer(Modifier.width(12.dp))
+            AppButton(
+                text = stringResource(Res.string.save),
+                enabled = name.isNotBlank(),
+                onClick = { onSave(name) },
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -458,30 +486,14 @@ private fun DeleteTemplateDialog(
     onDismiss: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    WindowDialog(
+    MarketConfirmDialog(
         show = show,
         title = stringResource(Res.string.delete),
-        onDismissRequest = onDismiss,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(Res.string.profile_delete_template_confirm, templateName),
-                color = MiuixTheme.colorScheme.onSurface,
-            )
-            Row(modifier = Modifier.fillMaxWidth()) {
-                AppTextButton(
-                    text = stringResource(Res.string.cancel),
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(12.dp))
-                AppTextButton(
-                    text = stringResource(Res.string.delete),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    onClick = { onDelete(templateName) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
+        message = stringResource(Res.string.profile_delete_template_confirm, templateName),
+        confirmText = stringResource(Res.string.delete),
+        onConfirm = { onDelete(templateName) },
+        onDismiss = onDismiss,
+        dismissText = stringResource(Res.string.cancel),
+        destructive = true,
+    )
 }

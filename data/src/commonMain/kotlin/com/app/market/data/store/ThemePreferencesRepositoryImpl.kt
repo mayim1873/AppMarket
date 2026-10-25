@@ -21,12 +21,6 @@ internal class ThemePreferencesRepositoryImpl(
 ) : ThemePreferencesRepository {
     private val _initialized = MutableStateFlow(false)
     override val initialized: StateFlow<Boolean> = _initialized.asStateFlow()
-    private val _enableBlur = MutableStateFlow(ThemePreferenceKeys.EnableBlur.default)
-    override val enableBlur: StateFlow<Boolean> = _enableBlur.asStateFlow()
-    private val _enableFloatingBottomBar = MutableStateFlow(false)
-    override val enableFloatingBottomBar: StateFlow<Boolean> = _enableFloatingBottomBar.asStateFlow()
-    private val _enableFloatingBottomBarBlur = MutableStateFlow(false)
-    override val enableFloatingBottomBarBlur: StateFlow<Boolean> = _enableFloatingBottomBarBlur.asStateFlow()
     private val _enableNavigationBadge = MutableStateFlow(ThemePreferenceKeys.EnableNavigationBadge.default)
     override val enableNavigationBadge: StateFlow<Boolean> = _enableNavigationBadge.asStateFlow()
     private val _navRailExpanded = MutableStateFlow(ThemePreferenceKeys.NavRailExpanded.default)
@@ -38,13 +32,6 @@ internal class ThemePreferencesRepositoryImpl(
 
     init {
         val arrivals = listOf(
-            observe("enableBlur", preferences.observe(ThemePreferenceKeys.EnableBlur)) { _enableBlur.value = it },
-            observe("enableFloatingBottomBar", preferences.observe(ThemePreferenceKeys.EnableFloatingBottomBar)) {
-                _enableFloatingBottomBar.value = it
-            },
-            observe("enableFloatingBottomBarBlur", preferences.observe(ThemePreferenceKeys.EnableFloatingBottomBarBlur)) {
-                _enableFloatingBottomBarBlur.value = it
-            },
             observe("enableNavigationBadge", preferences.observe(ThemePreferenceKeys.EnableNavigationBadge)) {
                 _enableNavigationBadge.value = it
             },
@@ -86,12 +73,6 @@ internal class ThemePreferencesRepositoryImpl(
         }
         return firstValue
     }
-
-    override suspend fun setEnableBlur(value: Boolean) = preferences.put(ThemePreferenceKeys.EnableBlur, value)
-    override suspend fun setEnableFloatingBottomBar(value: Boolean) = preferences.put(ThemePreferenceKeys.EnableFloatingBottomBar, value)
-
-    override suspend fun setEnableFloatingBottomBarBlur(value: Boolean) =
-        preferences.put(ThemePreferenceKeys.EnableFloatingBottomBarBlur, value)
 
     override suspend fun setEnableNavigationBadge(value: Boolean) = preferences.put(ThemePreferenceKeys.EnableNavigationBadge, value)
     override suspend fun setNavRailExpanded(value: Boolean) = preferences.put(ThemePreferenceKeys.NavRailExpanded, value)

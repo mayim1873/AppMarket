@@ -5,15 +5,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,24 +47,23 @@ import com.app.market.resources.installing_short
 import com.app.market.resources.no_saved_packages
 import com.app.market.resources.saved_package_delete_confirm
 import com.app.market.resources.saved_packages
+import com.app.market.ui.component.AppButton
+import com.app.market.ui.component.AppButtonDefaults
 import com.app.market.ui.component.AppCompactButton
 import com.app.market.ui.component.AppIcon
-import com.app.market.ui.component.AppTextButton
-import com.app.market.ui.component.CardSegmentContainer
 import com.app.market.ui.component.LoadingBox
+import com.app.market.ui.component.MarketCard
+import com.app.market.ui.component.MarketConfirmDialog
+import com.app.market.ui.component.MarketDialog
 import com.app.market.ui.component.MarketScaffold
 import com.app.market.ui.component.PageVerticalPadding
 import com.app.market.ui.util.formatSize
 import com.app.market.ui.util.formatTimeHm
 import com.app.market.viewmodel.SavedPackagesViewModel
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
+
+/** 卡片之间的间距（M3E 列表节奏）。 */
+private val SavedPackageCardSpacing = 12.dp
 
 @Composable
 fun SavedPackagesScreen(
@@ -86,12 +90,11 @@ fun SavedPackagesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .then(backdropModifier)
-                .scrollEndHaptic()
-                .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+            verticalArrangement = Arrangement.spacedBy(SavedPackageCardSpacing),
             contentPadding = PaddingValues(
-                start = innerPadding.calculateStartPadding(layoutDirection),
-                end = innerPadding.calculateEndPadding(layoutDirection),
+                start = innerPadding.calculateStartPadding(layoutDirection) + 16.dp,
+                end = innerPadding.calculateEndPadding(layoutDirection) + 16.dp,
                 top = innerPadding.calculateTopPadding() + PageVerticalPadding,
                 bottom = innerPadding.calculateBottomPadding() + PageVerticalPadding,
             ),
@@ -103,21 +106,33 @@ fun SavedPackagesScreen(
                         modifier = Modifier.fillParentMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            stringResource(Res.string.no_saved_packages),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Inbox,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = stringResource(Res.string.no_saved_packages),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
             itemsIndexed(
                 state.packages,
                 key = { _, pkg -> pkg.id },
-            ) { index, pkg ->
-                CardSegmentContainer(
-                    isFirst = index == 0,
-                    isLast = index == state.packages.lastIndex,
-                    modifier = Modifier.animateItem(placementSpec = null),
+            ) { _, pkg ->
+                MarketCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateItem(placementSpec = null),
                 ) {
                     SavedPackageRow(
                         pkg = pkg,
@@ -149,26 +164,31 @@ fun SavedPackagesScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun InstallWaitingDialog(
     show: Boolean,
     packageName: String,
 ) {
-    WindowDialog(
+    MarketDialog(
         show = show,
         title = stringResource(Res.string.installing_short),
         onDismissRequest = {},
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            InfiniteProgressIndicator(size = 24.dp)
+            LoadingIndicator(
+                modifier = Modifier.size(24.dp),
+                color = MaterialTheme.colorScheme.primary,
+            )
             Text(
                 text = stringResource(Res.string.install_waiting_message, packageName),
                 modifier = Modifier.weight(1f),
-                color = MiuixTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -180,25 +200,23 @@ private fun InstallSuccessDialog(
     packageName: String,
     onDismiss: () -> Unit,
 ) {
-    WindowDialog(
+    MarketDialog(
         show = show,
         title = stringResource(Res.string.install_success_title),
         onDismissRequest = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(Res.string.install_success_message, packageName),
-                modifier = Modifier.fillMaxWidth(),
-                color = MiuixTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-            )
-            AppTextButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = stringResource(Res.string.confirm),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-                onClick = onDismiss,
-            )
-        }
+        Text(
+            text = stringResource(Res.string.install_success_message, packageName),
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        AppButton(
+            modifier = Modifier.fillMaxWidth(),
+            text = stringResource(Res.string.confirm),
+            onClick = onDismiss,
+        )
     }
 }
 
@@ -209,32 +227,16 @@ private fun DeleteSavedPackageDialog(
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    WindowDialog(
+    MarketConfirmDialog(
         show = show,
         title = stringResource(Res.string.delete),
-        onDismissRequest = onDismiss,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(Res.string.saved_package_delete_confirm, packageName),
-                color = MiuixTheme.colorScheme.onSurface,
-            )
-            Row(modifier = Modifier.fillMaxWidth()) {
-                AppTextButton(
-                    modifier = Modifier.weight(1f),
-                    text = stringResource(Res.string.cancel),
-                    onClick = onDismiss,
-                )
-                Spacer(Modifier.width(16.dp))
-                AppTextButton(
-                    modifier = Modifier.weight(1f),
-                    text = stringResource(Res.string.confirm),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    onClick = onDelete,
-                )
-            }
-        }
-    }
+        message = stringResource(Res.string.saved_package_delete_confirm, packageName),
+        confirmText = stringResource(Res.string.confirm),
+        onConfirm = onDelete,
+        onDismiss = onDismiss,
+        dismissText = stringResource(Res.string.cancel),
+        destructive = true,
+    )
 }
 
 @Composable
@@ -243,10 +245,9 @@ private fun SavedPackageRow(
     onInstall: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    // 卡片自身提供 16dp 内边距，这里不再重复。
     Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
@@ -262,24 +263,25 @@ private fun SavedPackageRow(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    pkg.displayName,
+                    text = pkg.displayName,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    pkg.packageName,
+                    text = pkg.packageName,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    packageSummary(pkg),
+                    text = packageSummary(pkg),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -290,12 +292,17 @@ private fun SavedPackageRow(
             AppCompactButton(
                 text = stringResource(Res.string.install),
                 onClick = onInstall,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
             )
             AppCompactButton(
                 text = stringResource(Res.string.delete),
                 onClick = onDelete,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                colors = AppButtonDefaults.neutral(),
             )
         }
     }

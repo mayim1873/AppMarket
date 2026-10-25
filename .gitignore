@@ -7,6 +7,10 @@ local.properties
 *.log
 output.json
 
+# local toolchain / sandbox caches
+.tools/
+.gradle-home/
+
 # kotlin
 .kotlin/
 kotlin-js-store/

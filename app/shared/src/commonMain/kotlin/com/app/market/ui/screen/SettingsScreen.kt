@@ -5,6 +5,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -72,18 +79,16 @@ import com.app.market.resources.update_source_summary
 import com.app.market.resources.xiaomi_island_optimization
 import com.app.market.resources.xiaomi_island_optimization_summary
 import com.app.market.ui.component.MainTabScaffold
+import com.app.market.ui.component.MarketDivider
 import com.app.market.ui.component.PageVerticalPadding
-import com.app.market.ui.component.SectionTitle
+import com.app.market.ui.component.SettingsArrowRow
+import com.app.market.ui.component.SettingsDropdownRow
+import com.app.market.ui.component.SettingsGroup
+import com.app.market.ui.component.SettingsSwitchRow
 import com.app.market.ui.util.appSourceLabel
 import com.app.market.viewmodel.InstallerSettingsViewModel
 import com.app.market.viewmodel.UpdatesViewModel
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun SettingsTab(
@@ -120,9 +125,10 @@ fun SettingsTab(
             searchCapabilities.supportsComments ||
             searchCapabilities.supportsSameDeveloperApps
 
-    MainTabScaffold(title = stringResource(Res.string.nav_settings)) { topPadding, backdropModifier, scrollBehavior ->
+    MainTabScaffold(title = stringResource(Res.string.nav_settings)) { topPadding, _, scrollBehavior ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().then(backdropModifier).scrollEndHaptic().overScrollVertical()
+            modifier = Modifier
+                .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = topPadding + PageVerticalPadding,
@@ -130,54 +136,65 @@ fun SettingsTab(
             ),
         ) {
             item {
-                val sourceOptions = AppSource.entries
-                val updateSourceOptions = AppSource.entries.filter { it.capabilities.supportsUpdates }
-                val todaySourceOptions = AppSource.entries.filter { it.capabilities.supportsTodayFeed }
-                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                    WindowDropdownPreference(
+                SettingsGroup {
+                    val sourceOptions = AppSource.entries
+                    val updateSourceOptions = AppSource.entries.filter { it.capabilities.supportsUpdates }
+                    val todaySourceOptions = AppSource.entries.filter { it.capabilities.supportsTodayFeed }
+                    SettingsDropdownRow(
                         title = stringResource(Res.string.today_source),
                         summary = stringResource(Res.string.today_source_summary),
                         items = todaySourceOptions.map { appSourceLabel(it) },
                         selectedIndex = todaySourceOptions.indexOf(todaySource).coerceAtLeast(0),
-                        onSelectedIndexChange = { updatesViewModel.setTodaySource(todaySourceOptions[it]) },
+                        onSelectedIndexChange = {
+                            updatesViewModel.setTodaySource(todaySourceOptions[it])
+                        },
                     )
+                    MarketDivider(startPadding = 16.dp)
                     if (appManagementSupported) {
-                        WindowDropdownPreference(
+                        SettingsDropdownRow(
                             title = stringResource(Res.string.update_source),
                             summary = stringResource(Res.string.update_source_summary),
                             items = updateSourceOptions.map { appSourceLabel(it) },
                             selectedIndex = updateSourceOptions.indexOf(selectedUpdateSource).coerceAtLeast(0),
-                            onSelectedIndexChange = { updatesViewModel.setUpdateSource(updateSourceOptions[it]) },
+                            onSelectedIndexChange = {
+                                updatesViewModel.setUpdateSource(updateSourceOptions[it])
+                            },
                         )
+                        MarketDivider(startPadding = 16.dp)
                     }
-                    WindowDropdownPreference(
+                    SettingsDropdownRow(
                         title = stringResource(Res.string.search_sources),
                         summary = stringResource(Res.string.search_sources_summary),
                         items = sourceOptions.map { appSourceLabel(it) },
                         selectedIndex = sourceOptions.indexOf(selectedSource),
-                        onSelectedIndexChange = { updatesViewModel.setSearchSource(sourceOptions[it]) },
+                        onSelectedIndexChange = {
+                            updatesViewModel.setSearchSource(sourceOptions[it])
+                        },
                     )
                 }
             }
             if (appManagementSupported) {
-                item { SectionTitle(text = stringResource(Res.string.nav_updates)) }
                 item {
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                        SwitchPreference(
+                    SettingsGroup(title = stringResource(Res.string.nav_updates)) {
+                        SettingsSwitchRow(
                             title = stringResource(Res.string.show_system_apps),
                             summary = stringResource(Res.string.show_system_apps_summary),
                             checked = updatesState.showSystemUpdates,
                             onCheckedChange = updatesViewModel::setShowSystemUpdates,
                         )
-                        if (installerState.deltaUpdateSupported && selectedUpdateSource.capabilities.supportsDeltaUpdates) {
-                            SwitchPreference(
+                        if (installerState.deltaUpdateSupported &&
+                            selectedUpdateSource.capabilities.supportsDeltaUpdates
+                        ) {
+                            MarketDivider(startPadding = 16.dp)
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.installer_delta_update),
                                 summary = stringResource(Res.string.installer_delta_update_summary),
                                 checked = installerState.deltaUpdateEnabled,
                                 onCheckedChange = installerSettingsViewModel::setDeltaUpdateEnabled,
                             )
                             if (installerState.deltaUpdateEnabled) {
-                                SwitchPreference(
+                                MarketDivider(startPadding = 16.dp)
+                                SettingsSwitchRow(
                                     title = stringResource(Res.string.installer_delta_fallback_notice),
                                     summary = stringResource(Res.string.installer_delta_fallback_notice_summary),
                                     checked = installerState.deltaFallbackNoticeEnabled,
@@ -185,36 +202,32 @@ fun SettingsTab(
                                 )
                             }
                         }
-                        ArrowPreference(
+                        MarketDivider(startPadding = 16.dp)
+                        SettingsArrowRow(
                             title = stringResource(Res.string.ignored_apps),
                             summary = stringResource(Res.string.ignored_apps_summary),
                             onClick = onNavigateIgnored,
                         )
-                        ArrowPreference(
+                        MarketDivider(startPadding = 16.dp)
+                        SettingsArrowRow(
                             title = stringResource(Res.string.manual_update),
                             summary = stringResource(Res.string.manual_update_summary),
                             onClick = onNavigateManualUpdate,
                         )
-                        ArrowPreference(
+                        MarketDivider(startPadding = 16.dp)
+                        SettingsArrowRow(
                             title = stringResource(Res.string.update_history),
                             summary = stringResource(Res.string.update_history_summary),
                             onClick = onNavigateUpdateHistory,
                         )
                     }
                 }
-                if (showSearchFilters) {
-                    item { SectionTitle(text = stringResource(Res.string.nav_search)) }
-                }
-            } else {
-                if (showSearchFilters) {
-                    item { SectionTitle(text = stringResource(Res.string.nav_search)) }
-                }
             }
             if (showSearchFilters) {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SettingsGroup(title = stringResource(Res.string.nav_search)) {
                         if (searchCapabilities.supportsSearchAdsFilter) {
-                            SwitchPreference(
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.remove_search_ads),
                                 summary = stringResource(Res.string.remove_search_ads_summary),
                                 checked = updatesState.removeSearchAds,
@@ -222,7 +235,8 @@ fun SettingsTab(
                             )
                         }
                         if (searchCapabilities.supportsQuickAppFilter) {
-                            SwitchPreference(
+                            if (searchCapabilities.supportsSearchAdsFilter) MarketDivider(startPadding = 16.dp)
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.filter_quick_games),
                                 summary = stringResource(Res.string.filter_quick_games_summary),
                                 checked = updatesState.filterQuickGames,
@@ -230,7 +244,12 @@ fun SettingsTab(
                             )
                         }
                         if (searchCapabilities.supportsReservationFilter) {
-                            SwitchPreference(
+                            if (searchCapabilities.supportsSearchAdsFilter ||
+                                searchCapabilities.supportsQuickAppFilter
+                            ) {
+                                MarketDivider(startPadding = 16.dp)
+                            }
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.filter_reservation_apps),
                                 summary = stringResource(Res.string.filter_reservation_apps_summary),
                                 checked = updatesState.filterReservationApps,
@@ -241,11 +260,10 @@ fun SettingsTab(
                 }
             }
             if (showDetailOptions) {
-                item { SectionTitle(text = stringResource(Res.string.app_detail)) }
                 item {
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SettingsGroup(title = stringResource(Res.string.app_detail)) {
                         if (searchCapabilities.supportsPromotions) {
-                            SwitchPreference(
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.show_promotions),
                                 summary = stringResource(Res.string.show_promotions_summary),
                                 checked = showPromotions,
@@ -253,7 +271,8 @@ fun SettingsTab(
                             )
                         }
                         if (searchCapabilities.supportsComments) {
-                            SwitchPreference(
+                            if (searchCapabilities.supportsPromotions) MarketDivider(startPadding = 16.dp)
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.show_app_comments),
                                 summary = stringResource(Res.string.show_app_comments_summary),
                                 checked = showAppComments,
@@ -261,7 +280,12 @@ fun SettingsTab(
                             )
                         }
                         if (searchCapabilities.supportsSameDeveloperApps) {
-                            SwitchPreference(
+                            if (searchCapabilities.supportsPromotions ||
+                                searchCapabilities.supportsComments
+                            ) {
+                                MarketDivider(startPadding = 16.dp)
+                            }
+                            SettingsSwitchRow(
                                 title = stringResource(Res.string.show_same_developer),
                                 summary = stringResource(Res.string.show_same_developer_summary),
                                 checked = showSameDeveloper,
@@ -271,27 +295,30 @@ fun SettingsTab(
                     }
                 }
             }
-            item { SectionTitle(text = stringResource(Res.string.settings_section_download_install)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                    ArrowPreference(
+                SettingsGroup(title = stringResource(Res.string.settings_section_download_install)) {
+                    SettingsArrowRow(
                         title = stringResource(Res.string.downloading_apps),
                         summary = stringResource(Res.string.downloading_apps_summary),
+                        icon = Icons.Filled.Download,
                         onClick = onNavigateDownloadingApps,
                     )
                     if (installerState.installationSupported) {
-                        ArrowPreference(
+                        MarketDivider(startPadding = 16.dp)
+                        SettingsArrowRow(
                             title = stringResource(Res.string.saved_packages),
                             summary = stringResource(Res.string.saved_packages_summary),
                             onClick = onNavigateSavedPackages,
                         )
-                        ArrowPreference(
+                        MarketDivider(startPadding = 16.dp)
+                        SettingsArrowRow(
                             title = stringResource(Res.string.installer_section),
                             summary = stringResource(Res.string.installer_section_summary),
                             onClick = onNavigateInstaller,
                         )
                         if (installerState.focusNotificationSupported) {
-                            SwitchPreference(
+                            MarketDivider(startPadding = 16.dp)
+                            SettingsSwitchRow(
                                 // OS3 带岛胶囊称「超级岛」，OS2 仅焦点通知
                                 title = stringResource(
                                     if (installerState.xiaomiIslandSupported) {
@@ -308,41 +335,48 @@ fun SettingsTab(
                     }
                 }
             }
-            item { SectionTitle(text = stringResource(Res.string.general)) }
             item {
-                // 桌面端无「更新」页，首页选项相应剔除
-                val homePageOptions = if (appManagementSupported) {
-                    listOf(HomePage.TODAY, HomePage.UPDATES, HomePage.SEARCH)
-                } else {
-                    listOf(HomePage.TODAY, HomePage.SEARCH)
-                }
-                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                    WindowDropdownPreference(
+                SettingsGroup(title = stringResource(Res.string.general)) {
+                    // 桌面端无「更新」页，首页选项相应剔除。
+                    val homePageOptions = if (appManagementSupported) {
+                        listOf(HomePage.TODAY, HomePage.UPDATES, HomePage.SEARCH)
+                    } else {
+                        listOf(HomePage.TODAY, HomePage.SEARCH)
+                    }
+                    SettingsDropdownRow(
                         title = stringResource(Res.string.home_page),
                         summary = stringResource(Res.string.home_page_summary),
                         items = homePageOptions.map { stringResource(it.labelRes) },
                         selectedIndex = homePageOptions.indexOf(homePage).coerceAtLeast(0),
-                        onSelectedIndexChange = { updatesViewModel.setHomePage(homePageOptions[it]) },
+                        onSelectedIndexChange = {
+                            updatesViewModel.setHomePage(homePageOptions[it])
+                        },
                     )
-                    SwitchPreference(
+                    MarketDivider(startPadding = 16.dp)
+                    SettingsSwitchRow(
                         title = stringResource(Res.string.strip_name_subtitle),
                         summary = stringResource(Res.string.strip_name_subtitle_summary),
                         checked = stripAppNameSubtitle,
                         onCheckedChange = updatesViewModel::setStripAppNameSubtitle,
                     )
-                    ArrowPreference(
+                    MarketDivider(startPadding = 16.dp)
+                    SettingsArrowRow(
                         title = stringResource(Res.string.device_profile),
                         summary = stringResource(Res.string.device_profile_summary),
                         onClick = onNavigateDeviceProfile,
                     )
-                    ArrowPreference(
+                    MarketDivider(startPadding = 16.dp)
+                    SettingsArrowRow(
                         title = stringResource(Res.string.theme),
                         summary = stringResource(Res.string.theme_summary),
+                        icon = Icons.Filled.Settings,
                         onClick = onNavigateTheme,
                     )
-                    ArrowPreference(
+                    MarketDivider(startPadding = 16.dp)
+                    SettingsArrowRow(
                         title = stringResource(Res.string.about),
                         summary = stringResource(Res.string.about_summary),
+                        icon = Icons.Filled.Info,
                         onClick = onNavigateAbout,
                     )
                 }
