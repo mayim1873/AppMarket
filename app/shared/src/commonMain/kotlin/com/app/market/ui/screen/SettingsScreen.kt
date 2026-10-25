@@ -5,13 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.Update
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -298,7 +291,6 @@ fun SettingsTab(
                     SettingsArrowRow(
                         title = stringResource(Res.string.downloading_apps),
                         summary = stringResource(Res.string.downloading_apps_summary),
-                        icon = Icons.Filled.Download,
                         onClick = onNavigateDownloadingApps,
                     )
                     if (installerState.installationSupported) {
@@ -367,14 +359,12 @@ fun SettingsTab(
                     SettingsArrowRow(
                         title = stringResource(Res.string.theme),
                         summary = stringResource(Res.string.theme_summary),
-                        icon = Icons.Filled.Settings,
                         onClick = onNavigateTheme,
                     )
                     MarketDivider(startPadding = 16.dp)
                     SettingsArrowRow(
                         title = stringResource(Res.string.about),
                         summary = stringResource(Res.string.about_summary),
-                        icon = Icons.Filled.Info,
                         onClick = onNavigateAbout,
                     )
                 }
