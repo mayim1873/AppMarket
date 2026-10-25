@@ -186,7 +186,7 @@ private fun UpdatesCardList(
                 onUpdateAll = { viewModel.downloadAll(updates) },
             )
         }
-        itemsIndexed(updates, key = { _, app -> app.packageName }) { _, app ->
+        itemsIndexed(updates, key = { _, app -> "${app.source}:${app.packageName}" }) { _, app ->
             val packageName = app.packageName
             val downloadState by remember(packageName) {
                 derivedStateOf { downloadStates.value[packageName] }

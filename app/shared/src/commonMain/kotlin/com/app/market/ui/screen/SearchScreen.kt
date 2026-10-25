@@ -374,7 +374,8 @@ private fun SearchResultsList(
             }
         }
 
-        items(state.results, key = { it.app.packageName }) { item ->
+        // key 需唯一：同一包名可能来自不同来源，因此带上 source。
+        items(state.results, key = { "${it.app.source}:${it.app.packageName}" }) { item ->
             val app = item.app
             val packageName = app.packageName
             val downloadState by remember(packageName) {

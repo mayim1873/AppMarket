@@ -240,8 +240,10 @@ private fun AboutContent(
             SectionTitle(text = stringResource(Res.string.about_open_source_licenses))
         }
 
-        // 多行大卡片拆成独立 lazy item，用 CardSegmentContainer 拼出视觉连续的卡片
-        itemsIndexed(OpenSourceLicenses, key = { _, license -> license.url }) { index, license ->
+        // 多行大卡片拆成独立 lazy item，用 CardSegmentContainer 拼出视觉连续的卡片。
+        // key 必须唯一：不同条目可能指向同一个地址（如 Core 与 SplashScreen），
+        // 所以用「序号 + 标题」而不是 URL。
+        itemsIndexed(OpenSourceLicenses, key = { index, license -> "${license.title}#$index" }) { index, license ->
             CardSegmentContainer(
                 isFirst = index == 0,
                 isLast = index == OpenSourceLicenses.lastIndex,
